@@ -1,0 +1,40 @@
+# Compiled binaries
+bwa-mem2
+libbwa.a
+*.o
+*.a
+ 
+# Accidental shell artifact files (from bwa-mem2 build dir)
+-o
+rm
+echo
+done
+pipefail
+
+ 
+# Index builder: compiled binaries (auto-built on user's machine)
+index-builder/preprocess_genome
+index-builder/derive_2stepref
+index-builder/convert_sa_to_bin_CF
+index-builder/make_cp_occ_2step
+index-builder/make_ref16_packed
+index-builder/make_jumptable_2step
+ 
+# Index builder: auto-downloaded gsufsort
+index-builder/tools/gsufsort/
+ 
+# Index output files (too large for git — user generates locally)
+index-builder/index/
+ 
+# OS junk
+.DS_Store
+*.swp
+*~
+
+# ext/ compiled artifacts
+ext/**/*.o
+ext/**/*.a
+ext/**/.git
+
+src/rosaseed/*.o
+src/rosaseed/*.a
