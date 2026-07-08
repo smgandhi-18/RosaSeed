@@ -220,27 +220,6 @@ CPPFLAGS_EXTRA=" \
 
 ---
 
-## The 2-step encoding
-
-RosaSeed introduces a **2-step FM-index** that encodes pairs of consecutive
-nucleotides as a single base-16 symbol, reducing the effective sequence length
-and enabling longer seeds to be resolved with fewer FM-index steps.
-
-```
-NT pair  → base-16 symbol
-AA=0  AC=1  AG=2  AT=3
-CA=4  CC=5  CG=6  CT=7
-GA=8  GC=9  GG=A  GT=B
-TA=C  TC=D  TG=E  TT=F
-```
-
-The reference is encoded as four segments — Forward Even (FE), Forward Odd (FO),
-RC Even (RCE), RC Odd (RCO) — concatenated into a single string. This allows
-any 14-nt (7 base-16 pairs), 15-nt (7 pairs + 1 NT), or 16-nt (8 pairs) seed
-to be located with a single jump table lookup followed by FM-index extension.
-
----
-
 ## Citation
 
 If you use RosaSeed in your research, please cite:
