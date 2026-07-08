@@ -230,8 +230,8 @@ If you use RosaSeed in your research, please cite:
 
 Please also cite the original BWA-MEM2:
 
-> Md, V., Misra, S., Li, H., & Jain, C. (2019). Massively parallel
-> seeding on FPGAs for long read mapping. *IEEE INFOCOM 2019*.
+> Vasimuddin Md, Sanchit Misra, Heng Li, Srinivas Aluru. Efficient Architecture-Aware Acceleration
+> of BWA-MEM for Multicore Systems. IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019. 10.1109/IPDPS.2019.00041 
 
 ---
 
@@ -239,15 +239,14 @@ Please also cite the original BWA-MEM2:
 
 RosaSeed is built on [BWA-MEM2](https://github.com/bwa-mem2/bwa-mem2)
 by Vasimuddin Md, Sanchit Misra, Heng Li, and Chirag Jain.
-The FM-index is constructed using
-[gsufsort](https://github.com/felipelouza/gsufsort)
-by Louza et al.
+RosaSeed uses [gsufsort](https://github.com/felipelouza/gsufsort)
+by Louza et al., to construct SA and BWT during index construction.
 
 ---
 
 ## License
 
-RosaSeed extensions: MIT License.
+RosaSeed: MIT License.
 Copyright (c) 2026 Shyama Gandhi, University of Alberta.
 
 BWA-MEM2 components: MIT License.
