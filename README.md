@@ -117,7 +117,7 @@ Index files are written to `index-builder/index/<genome_name>/` by default
 ```
 
 > **Note:** The FASTA path supplied to `./bwa-mem2 mem` must be the same
-> one used in Step 3 — BWA-MEM2 looks for its index files (`.0123`, `.pac`
+> one used in Step 3 : BWA-MEM2 looks for its index files (`.0123`, `.pac`
 > etc.) in the same directory as the FASTA.
 
 ---
@@ -279,7 +279,7 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 | vs Minimap2 | 4.8× | 2.48× |
 | vs Bowtie2 | 33.2× | 10.8× |
 
-Peak memory: **49.61 GB** — ~25% less than ERT/ERT2 (~66.3 GB each).
+Peak memory: **49.61 GB** - ~25% less than ERT/ERT2 (~66.3 GB each).
 This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
 index files (~6.9 GB) required by the downstream chaining and alignment
 extension pipeline.
