@@ -10,6 +10,28 @@ variant analysis tools.
 
 ---
 
+## Requirements
+
+| Requirement | Notes |
+|---|---|
+| GCC / g++ ≥ 7 | C++14 support required |
+| GNU Make | Standard build |
+| x86-64 with AVX2 | Required for `arch=native` |
+| RAM ≥ 64 GB | ~50 GB peak at alignment time |
+
+**Index builder additional requirements:**
+
+```bash
+sudo apt install gcc make git python3 python3-pip
+pip install numpy
+```
+
+RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for T2T 
+gapless human genome). The BWA-MEM2 index build (`bwa-mem2 index`) requires
+~62 GB RAM for the human genome.
+
+---
+
 ## Repository structure
 
 ```
@@ -132,28 +154,6 @@ RosaSeed requires two separate indexes:
 | RosaSeed index | `index-builder/build_2step_pipeline.sh` | `index-builder/index/<name>/` | ~42.7 GB |
 
 **Combined peak memory at alignment time: ~49.61 GB**
-
----
-
-## Requirements
-
-| Requirement | Notes |
-|---|---|
-| GCC / g++ ≥ 7 | C++14 support required |
-| GNU Make | Standard build |
-| x86-64 with AVX2 | Required for `arch=native` |
-| RAM ≥ 64 GB | ~50 GB peak at alignment time |
-
-**Index builder additional requirements:**
-
-```bash
-sudo apt install gcc make git python3 python3-pip
-pip install numpy
-```
-
-RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for T2T 
-gapless human genome). The BWA-MEM2 index build (`bwa-mem2 index`) requires
-~62 GB RAM for the human genome.
 
 ---
 
