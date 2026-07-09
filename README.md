@@ -10,37 +10,6 @@ variant analysis tools.
 
 ---
 
-## Key results
-
-Compared against BWA-MEM2, Minimap2, Bowtie2, and the Enumerated Radix
-Tree (ERT) algorithm on simulated and real short-read datasets:
-
-| Comparison | Seed processing speedup | Total alignment speedup |
-|---|---|---|
-| vs BWA-MEM2 | **15.0×** | **3.84×** |
-| vs ERT | 4.0× | 2.48× |
-| vs ERT2 | 1.2× | 1.44× |
-| vs Minimap2 | 4.8× | 2.48× |
-| vs Bowtie2 | 33.2× | 10.8× |
-
-Peak memory: **49.61 GB** — ~25% less than ERT/ERT2 (~66.3 GB each).
-This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
-index files (~6.9 GB) required by the downstream chaining and alignment
-extension pipeline.
-
-On a separate AMD Zen3 workstation, the reduced-aggressiveness
-**miniRosaSeed** configuration achieves a **2.08× end-to-end speedup**
-over minibwa at single-thread execution while attaining
-**2.581 percentage points higher standard accuracy**, remaining faster
-and more accurate simultaneously up to ~28 threads.
-
-RosaSeed exposes multiple runtime-memory operating configurations
-spanning memory-efficient and high-performance designs, enabling users
-to select operating points appropriate for diverse computational
-environments while maintaining alignment accuracy comparable to BWA-MEM2.
-
----
-
 ## Repository structure
 
 ```
@@ -297,6 +266,36 @@ Use the alignment command as:
 ```
 ---
 
+## Key results
+
+Compared against BWA-MEM2, Minimap2, Bowtie2, and the Enumerated Radix
+Tree (ERT) algorithm on simulated and real short-read datasets:
+
+| Comparison | Seed processing speedup | Total alignment speedup |
+|---|---|---|
+| vs BWA-MEM2 | **15.0×** | **3.84×** |
+| vs ERT | 4.0× | 2.48× |
+| vs ERT2 | 1.2× | 1.44× |
+| vs Minimap2 | 4.8× | 2.48× |
+| vs Bowtie2 | 33.2× | 10.8× |
+
+Peak memory: **49.61 GB** — ~25% less than ERT/ERT2 (~66.3 GB each).
+This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
+index files (~6.9 GB) required by the downstream chaining and alignment
+extension pipeline.
+
+On a separate AMD Zen3 workstation, the reduced-aggressiveness
+**miniRosaSeed** configuration achieves a **2.08× end-to-end speedup**
+over minibwa at single-thread execution while attaining
+**2.581 percentage points higher standard accuracy**, remaining faster
+and more accurate simultaneously up to ~28 threads.
+
+RosaSeed exposes multiple runtime-memory operating configurations
+spanning memory-efficient and high-performance designs, enabling users
+to select operating points appropriate for diverse computational
+environments while maintaining alignment accuracy comparable to BWA-MEM2.
+
+---
 
 ## Citation
 
