@@ -337,3 +337,6 @@ BWA-MEM2 components: MIT License.
 Copyright (c) 2019 Vasimuddin Md, Sanchit Misra, Heng Li, Chirag Jain.
 
 See [LICENSE](LICENSE) for full text.
+
+gsufsort: GPL-3.0 License
+Copyright (c) 2020 Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.
