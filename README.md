@@ -312,6 +312,11 @@ Please also cite the original BWA-MEM2:
 > IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019.
 > doi:10.1109/IPDPS.2019.00041
 
+If you use gsufsort for index building, please cite:
+
+> Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.. gsufsort: 
+> constructing suffix arrays, LCP arrays and BWTs for string collections. 
+> Algorithms Mol Biol 15, 18 (2020). https://doi.org/10.1186/s13015-020-00177-y
 ---
 
 ## Acknowledgements
