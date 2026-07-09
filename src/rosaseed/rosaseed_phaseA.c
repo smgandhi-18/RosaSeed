@@ -33,7 +33,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #include "load_data.h"
 #include "macros.h"
 #include "profiling.h"
-#include "get_reads.h"
+#include "read_init.h"
 #include "helper_functions.h"
 #include "bwa.h"
 
