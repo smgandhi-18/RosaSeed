@@ -608,7 +608,7 @@ void phaseI_routine(
    THAT read, then move to the next read's step.  
    ======================================================================= */
 
-#include "phaseI_slot_state.h"
+#include "phaseA_dec.h"
 
 /* -----------------------------------------------------------------------
    Per-pivot working state for one read in the coroutine interleaver.
