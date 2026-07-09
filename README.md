@@ -206,10 +206,10 @@ Use exactly one per build.
 
 | Flag | CF | SA size | Description |
 |---|---|---|---|
-| `-DSA_COMPRESSION_FACTOR_POWER=0` | 1 | ~30 GB | Full SA (highest accuracy) |
-| `-DSA_COMPRESSION_FACTOR_POWER=1` | 2 | ~15 GB | Half SA (recommended) |
+| `-DSA_COMPRESSION_FACTOR_POWER=0` | 1 | ~30 GB | Full SA |
+| `-DSA_COMPRESSION_FACTOR_POWER=1` | 2 | ~15 GB | Half SA |
 | `-DSA_COMPRESSION_FACTOR_POWER=2` | 4 | ~7.3 GB | Quarter SA |
-| `-DSA_COMPRESSION_FACTOR_POWER=3` | 8 | ~3.6 GB | Eighth SA (lowest memory) |
+| `-DSA_COMPRESSION_FACTOR_POWER=3` | 8 | ~3.6 GB | Eighth SA  |
 
 ### Other flags
 
