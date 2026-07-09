@@ -310,7 +310,7 @@ Please also cite the original BWA-MEM2:
 > Vasimuddin Md, Sanchit Misra, Heng Li, Srinivas Aluru. Efficient
 > Architecture-Aware Acceleration of BWA-MEM for Multicore Systems.
 > IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019.
-> doi:10.1109/IPDPS.2019.00041
+> doi:https://doi.org/10.1109/IPDPS.2019.00041
 
 If you use gsufsort for index building, please cite:
 
