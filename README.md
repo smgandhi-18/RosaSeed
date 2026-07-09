@@ -129,7 +129,7 @@ RosaSeed requires two separate indexes:
 | Index | Built by | Location | Size (T2T human) |
 |---|---|---|---|
 | BWA-MEM2 index | `./bwa-mem2 index genome.fna` | Same directory as FASTA | ~6.9 GB |
-| RosaSeed 2-step FM-index | `index-builder/build_2step_pipeline.sh` | `index-builder/index/<name>/` | ~42.7 GB |
+| RosaSeed index | `index-builder/build_2step_pipeline.sh` | `index-builder/index/<name>/` | ~42.7 GB |
 
 **Combined peak memory at alignment time: ~49.61 GB**
 
@@ -279,7 +279,7 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 | vs Minimap2 | 4.8× | 2.48× |
 | vs Bowtie2 | 33.2× | 10.8× |
 
-Peak memory: **49.61 GB** - ~25% less than ERT/ERT2 (~66.3 GB each).
+Peak memory: **49.61 GB** which is ~25% less than ERT/ERT2 (~66.3 GB each).
 This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
 index files (~6.9 GB) required by the downstream chaining and alignment
 extension pipeline.
