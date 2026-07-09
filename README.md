@@ -24,6 +24,9 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 | vs Bowtie2 | 33.2× | 10.8× |
 
 Peak memory: **49.61 GB** — ~25% less than ERT/ERT2 (~66.3 GB each).
+This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
+index files (~6.9 GB) required by the downstream chaining and alignment
+extension pipeline.
 
 On a separate AMD Zen3 workstation, the reduced-aggressiveness
 **miniRosaSeed** configuration achieves a **2.08× end-to-end speedup**
@@ -56,7 +59,7 @@ RosaSeed/
 │   │   ├── macros.h
 │   │   └── ...
 │   └── [bwa-mem2 source files]
-├── index-builder/           FM-index build pipeline
+├── index-builder/           RosaSeed FM-index build pipeline
 │   ├── build_2step_pipeline.sh
 │   ├── rss_monitor.py
 │   ├── src/
@@ -77,21 +80,7 @@ git clone https://github.com/smgandhi-18/RosaSeed.git
 cd RosaSeed
 ```
 
-### 2. Build the index
-
-Before running alignment, build the 2-step FM-index for your reference genome:
-
-```bash
-cd index-builder
-chmod +x build_2step_pipeline.sh
-./build_2step_pipeline.sh /path/to/genome.fna
-cd ..
-```
-
-See [index-builder/README.md](index-builder/README.md) for full options.
-Index files are written to `index-builder/index/<genome_name>/` by default.
-
-### 3. Build RosaSeed
+### 2. Build RosaSeed
 
 ```bash
 make clean
@@ -107,18 +96,73 @@ make arch=native CXX=g++ ROSASEED=1 \
     -DROSASEED_PRECHAIN_WEAK_LEN=60"
 ```
 
-### 4. Run alignment
+### 3. Build the BWA-MEM2 index
+
+RosaSeed replaces the seeding stage but the downstream chaining and
+alignment extension pipeline still uses BWA-MEM2's own index files.
+Generate them with:
+
+```bash
+./bwa-mem2 index /path/to/genome.fna
+```
+
+This produces the following files alongside the FASTA (~6.9 GB total):
+```
+genome.fna.0123
+genome.fna.amb
+genome.fna.ann
+genome.fna.bwt.2bit.64
+genome.fna.pac
+```
+
+BWA-MEM2 automatically locates these files by appending extensions to the
+FASTA path supplied at alignment time — no extra flags needed.
+
+### 4. Build the RosaSeed index
+
+Build the 2-step FM-index for your reference genome (~41 min, ~56 GB RAM
+peak for human T2T genome):
+
+```bash
+cd index-builder
+chmod +x build_2step_pipeline.sh
+./build_2step_pipeline.sh /path/to/genome.fna
+cd ..
+```
+
+See [index-builder/README.md](index-builder/README.md) for full options.
+Index files are written to `index-builder/index/<genome_name>/` by default
+(~42.7 GB for the T2T human genome with 14+15-mer jump tables).
+
+### 5. Run alignment
 
 ```bash
 ./bwa-mem2 mem \
     -t 20 \
     -k 19 \
-    --rs-index /path/to/index-builder/index/genome/ \
+    --rs-index index-builder/index/<genome_name>/ \
     --rs-cap 2000 \
-    genome.fna \
+    /path/to/genome.fna \
     reads_R1.fastq.gz \
     > output.sam
 ```
+
+> **Note:** The FASTA path supplied to `./bwa-mem2 mem` must be the same
+> one used in Step 3 — BWA-MEM2 looks for its index files (`.0123`, `.pac`
+> etc.) in the same directory as the FASTA.
+
+---
+
+## Index summary
+
+RosaSeed requires two separate indexes:
+
+| Index | Built by | Location | Size (T2T human) |
+|---|---|---|---|
+| BWA-MEM2 index | `./bwa-mem2 index genome.fna` | Same directory as FASTA | ~6.9 GB |
+| RosaSeed 2-step FM-index | `index-builder/build_2step_pipeline.sh` | `index-builder/index/<name>/` | ~42.7 GB |
+
+**Combined peak memory at alignment time: ~49.61 GB**
 
 ---
 
@@ -129,16 +173,18 @@ make arch=native CXX=g++ ROSASEED=1 \
 | GCC / g++ ≥ 7 | C++14 support required |
 | GNU Make | Standard build |
 | x86-64 with AVX2 | Required for `arch=native` |
-| RAM ≥ 64 GB | Index load: ~50 GB peak |
+| RAM ≥ 64 GB | ~50 GB peak at alignment time |
 
-**Index builder requirements:**
+**Index builder additional requirements:**
 
 ```bash
 sudo apt install gcc make git python3 python3-pip
 pip install numpy
 ```
 
-RAM: ~64 GB minimum (peak ~56 GB during index construction for human genome).
+RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for
+the human genome). The BWA-MEM2 index build (`bwa-mem2 index`) requires
+~60 GB RAM for the human genome.
 
 ---
 
@@ -230,8 +276,10 @@ If you use RosaSeed in your research, please cite:
 
 Please also cite the original BWA-MEM2:
 
-> Vasimuddin Md, Sanchit Misra, Heng Li, Srinivas Aluru. Efficient Architecture-Aware Acceleration
-> of BWA-MEM for Multicore Systems. IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019. 10.1109/IPDPS.2019.00041 
+> Vasimuddin Md, Sanchit Misra, Heng Li, Srinivas Aluru. Efficient
+> Architecture-Aware Acceleration of BWA-MEM for Multicore Systems.
+> IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019.
+> doi:10.1109/IPDPS.2019.00041
 
 ---
 
