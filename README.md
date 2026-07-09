@@ -47,10 +47,10 @@ environments while maintaining alignment accuracy comparable to BWA-MEM2.
 RosaSeed/
 ├── src/
 │   ├── rosaseed/            RosaSeed seeding algorithm
-│   │   ├── rosaseed_phaseI_coroutine.c
-│   │   ├── rosaseed_phaseII_coro.c
-│   │   ├── rosaseed_gapfillphase_pf.c
-│   │   ├── rosaseed_core_bridge_coroutine_p2.cpp
+│   │   ├── rosaseed_phaseA.c
+│   │   ├── rosaseed_phaseB.c
+│   │   ├── rosaseed_gapfill_PhaseC.c
+│   │   ├── rosaseed_core_bridge.cpp
 │   │   ├── load_data_mmap.c
 │   │   ├── mem_alloc.c
 │   │   ├── helper_functions.c
@@ -98,8 +98,8 @@ make arch=native CXX=g++ ROSASEED=1 \
 
 ### 3. Build the BWA-MEM2 index
 
-RosaSeed replaces the seeding stage but the downstream chaining and
-alignment extension pipeline still uses BWA-MEM2's own index files.
+RosaSeed replaces the seeding stage and rewrites the chaining stage with pruning heuristics but
+alignment extension (BSW) pipeline still uses BWA-MEM2's own index files.
 Generate them with:
 
 ```bash
@@ -116,11 +116,11 @@ genome.fna.pac
 ```
 
 BWA-MEM2 automatically locates these files by appending extensions to the
-FASTA path supplied at alignment time — no extra flags needed.
+FASTA path supplied at alignment time - no extra flags needed.
 
 ### 4. Build the RosaSeed index
 
-Build the 2-step FM-index for your reference genome (~41 min, ~56 GB RAM
+Build the RosaSeed index for your reference genome (~44 min, ~56 GB RAM
 peak for human T2T genome):
 
 ```bash
@@ -132,13 +132,13 @@ cd ..
 
 See [index-builder/README.md](index-builder/README.md) for full options.
 Index files are written to `index-builder/index/<genome_name>/` by default
-(~42.7 GB for the T2T human genome with 14+15-mer jump tables).
+(~42.7 GB for the T2T human genome with 14 and 15-mer jump tables).
 
 ### 5. Run alignment
 
 ```bash
 ./bwa-mem2 mem \
-    -t 20 \
+    -t 1 \
     -k 19 \
     --rs-index index-builder/index/<genome_name>/ \
     --rs-cap 2000 \
@@ -182,9 +182,9 @@ sudo apt install gcc make git python3 python3-pip
 pip install numpy
 ```
 
-RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for
-the human genome). The BWA-MEM2 index build (`bwa-mem2 index`) requires
-~60 GB RAM for the human genome.
+RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for T2T 
+gapless human genome). The BWA-MEM2 index build (`bwa-mem2 index`) requires
+~62 GB RAM for the human genome.
 
 ---
 
@@ -206,7 +206,7 @@ Use exactly one per build.
 
 | Flag | CF | SA size | Description |
 |---|---|---|---|
-| `-DSA_COMPRESSION_FACTOR_POWER=0` | 1 | ~30 GB | Full SA |
+| `-DSA_COMPRESSION_FACTOR_POWER=0` | 1 | ~29 GB | Full SA |
 | `-DSA_COMPRESSION_FACTOR_POWER=1` | 2 | ~15 GB | Half SA |
 | `-DSA_COMPRESSION_FACTOR_POWER=2` | 4 | ~7.3 GB | Quarter SA |
 | `-DSA_COMPRESSION_FACTOR_POWER=3` | 8 | ~3.6 GB | Eighth SA  |
@@ -215,45 +215,12 @@ Use exactly one per build.
 
 | Flag | Description |
 |---|---|
-| `-DENABLE_F_RC_CHOICE` | Try both strands at first pivot, pick better one |
+| `-DENABLE_F_RC_CHOICE` | Try both strands at first pivot, pick smallest one |
 | `-DGAPFILL_ALWAYS_RUN_BOTH_STRANDS` | Run gap fill on both strands |
-| `-DGAPFILL_EARLY_EXIT` | Exit gap fill early when good seed found |
+| `-DGAPFILL_EARLY_EXIT` | Exit gap fill early when gap is covered |
 | `-DROSASEED_PRECHAIN_SINGLETON_SUPPRESS` | Suppress singleton seeds before chaining |
 | `-DROSASEED_PRECHAIN_TRIGGER=N` | Apply pre-chain filter when seed count > N |
 | `-DROSASEED_PRECHAIN_WEAK_LEN=N` | Seeds shorter than N bp treated as weak |
-
-### Recommended configurations
-
-**High-performance (recommended default):**
-```bash
-CPPFLAGS_EXTRA=" \
-  -DLOAD_JTABLE_14nt \
-  -DENABLE_F_RC_CHOICE \
-  -DSA_COMPRESSION_FACTOR_POWER=1 \
-  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
-  -DGAPFILL_EARLY_EXIT \
-  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
-  -DROSASEED_PRECHAIN_TRIGGER=200 \
-  -DROSASEED_PRECHAIN_WEAK_LEN=60"
-```
-
-**Memory-efficient:**
-```bash
-CPPFLAGS_EXTRA=" \
-  -DLOAD_JTABLE_14nt \
-  -DENABLE_F_RC_CHOICE \
-  -DSA_COMPRESSION_FACTOR_POWER=3"
-```
-
-**miniRosaSeed (reduced aggressiveness, benchmarked vs minibwa):**
-```bash
-CPPFLAGS_EXTRA=" \
-  -DLOAD_JTABLE_14nt \
-  -DENABLE_F_RC_CHOICE \
-  -DSA_COMPRESSION_FACTOR_POWER=1"
-```
-
----
 
 ## Runtime flags
 
@@ -266,11 +233,76 @@ CPPFLAGS_EXTRA=" \
 
 ---
 
+### Recommended configurations
+
+**Recommended default configuration:**
+```bash
+CPPFLAGS_EXTRA=" \
+  -DLOAD_JTABLE_14nt \
+  -DENABLE_F_RC_CHOICE \
+  -DSA_COMPRESSION_FACTOR_POWER=1 \
+  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
+  -DGAPFILL_EARLY_EXIT \
+  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+  -DROSASEED_PRECHAIN_TRIGGER=200 \
+  -DROSASEED_PRECHAIN_WEAK_LEN=60"
+```
+Use the alignment command as:
+```
+./bwa-mem2 mem \
+    -t 1 \
+    -k 19 \
+    --rs-index index-builder/index/<genome_name>/ \
+    --rs-cap 2000 \
+    /path/to/genome.fna \
+    reads_R1.fastq.gz \
+    > output.sam
+```
+
+**Memory-efficient:**
+```bash
+CPPFLAGS_EXTRA=" \
+  -DLOAD_JTABLE_14nt \
+  -DENABLE_F_RC_CHOICE \
+  -DSA_COMPRESSION_FACTOR_POWER=3 \
+  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
+  -DGAPFILL_EARLY_EXIT \
+  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+  -DROSASEED_PRECHAIN_TRIGGER=200 \
+  -DROSASEED_PRECHAIN_WEAK_LEN=60"
+```
+
+**miniRosaSeed (reduced aggressiveness, benchmarked vs minibwa):**
+```bash
+CPPFLAGS_EXTRA=" \
+  -DLOAD_JTABLE_14nt \
+  -DENABLE_F_RC_CHOICE \
+  -DSA_COMPRESSION_FACTOR_POWER=1 \
+  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
+  -DGAPFILL_EARLY_EXIT \
+  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+  -DROSASEED_PRECHAIN_TRIGGER=50 \
+  -DROSASEED_PRECHAIN_WEAK_LEN=60"
+```
+Use the alignment command as:
+```
+./bwa-mem2 mem \
+    -t 1 \
+    -k 19 \
+    --rs-index index-builder/index/<genome_name>/ \
+    --rs-cap 50 \
+    /path/to/genome.fna \
+    reads_R1.fastq.gz \
+    > output.sam
+```
+---
+
+
 ## Citation
 
 If you use RosaSeed in your research, please cite:
 
-> Gandhi, S. et al. (2026). RosaSeed: A Fast and Configurable Seeding
+> Gandhi Shyama, Cockburn Bruce (2026). RosaSeed: A Fast and Configurable Seeding
 > Algorithm for Short-Read DNA Sequence Alignment.
 > University of Alberta.
 
