@@ -10,6 +10,36 @@ variant analysis tools.
 
 ---
 
+## Repository structure
+
+```
+RosaSeed/
+├── src/
+│   ├── rosaseed/            RosaSeed seeding algorithm
+│   │   ├── rosaseed_phaseA.c
+│   │   ├── rosaseed_phaseB.c
+│   │   ├── rosaseed_gapfill_PhaseC.c
+│   │   ├── rosaseed_core_bridge.cpp
+│   │   ├── load_data_mmap.c
+│   │   ├── mem_alloc.c
+│   │   ├── helper_functions.c
+│   │   ├── bwa.c
+│   │   ├── file_dec.h
+│   │   ├── macros.h
+│   │   └── ...
+│   └── [bwa-mem2 source files]
+├── index-builder/           RosaSeed FM-index build pipeline
+│   ├── build_2step_pipeline.sh
+│   ├── rss_monitor.py
+│   ├── src/
+│   └── README.md
+├── Makefile
+├── LICENSE
+└── README.md
+```
+
+---
+
 ## Requirements
 
 | Requirement | Notes |
@@ -26,39 +56,9 @@ sudo apt install gcc make git python3 python3-pip
 pip install numpy
 ```
 
-RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for T2T 
-gapless human genome). The BWA-MEM2 index build (`bwa-mem2 index`) requires
-~62 GB RAM for the human genome.
-
----
-
-## Repository structure
-
-```
-RosaSeed/
-├── src/
-│   ├── rosaseed/            RosaSeed seeding algorithm
-│   │   ├── rosaseed_phaseA.c
-│   │   ├── rosaseed_phaseB.c
-│   │   ├── rosaseed_gapfill_PhaseC.c
-│   │   ├── rosaseed_core_bridge.cpp
-│   │   ├── load_data_mmap.c
-│   │   ├── mem_alloc.c
-│   │   ├── helper_functions.c
-│   │   ├── bwa.c
-│   │   ├── file_dec_new.h
-│   │   ├── macros.h
-│   │   └── ...
-│   └── [bwa-mem2 source files]
-├── index-builder/           RosaSeed FM-index build pipeline
-│   ├── build_2step_pipeline.sh
-│   ├── rss_monitor.py
-│   ├── src/
-│   └── README.md
-├── Makefile
-├── LICENSE
-└── README.md
-```
+RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for the
+T2T gapless human genome). The BWA-MEM2 index build (`bwa-mem2 index`)
+requires ~62 GB RAM for the human genome.
 
 ---
 
@@ -89,15 +89,15 @@ make arch=native CXX=g++ ROSASEED=1 \
 
 ### 3. Build the BWA-MEM2 index
 
-RosaSeed replaces the seeding stage and rewrites the chaining stage with pruning heuristics but
-alignment extension (BSW) pipeline still uses BWA-MEM2's own index files.
-Generate them with:
+RosaSeed replaces the seeding stage and modifies the chaining stage with
+pruning heuristics. The alignment extension (Smith-Waterman) pipeline still
+uses BWA-MEM2's own index files. Generate them with:
 
 ```bash
 ./bwa-mem2 index /path/to/genome.fna
 ```
 
-This produces the following files alongside the FASTA (~6.9 GB total):
+This produces the following files alongside the FASTA:
 ```
 genome.fna.0123
 genome.fna.amb
@@ -111,9 +111,6 @@ FASTA path supplied at alignment time - no extra flags needed.
 
 ### 4. Build the RosaSeed index
 
-Build the RosaSeed index for your reference genome (~44 min, ~56 GB RAM
-peak for human T2T genome):
-
 ```bash
 cd index-builder
 chmod +x build_2step_pipeline.sh
@@ -124,12 +121,13 @@ cd ..
 See [index-builder/README.md](index-builder/README.md) for full options.
 Index files are written to `index-builder/index/<genome_name>/` by default
 (~42.7 GB for the T2T human genome with 14 and 15-mer jump tables).
+Build time: ~44 minutes, peak RAM ~56 GB.
 
 ### 5. Run alignment
 
 ```bash
 ./bwa-mem2 mem \
-    -t 1 \
+    -t 20 \
     -k 19 \
     --rs-index index-builder/index/<genome_name>/ \
     --rs-cap 2000 \
@@ -139,7 +137,7 @@ Index files are written to `index-builder/index/<genome_name>/` by default
 ```
 
 > **Note:** The FASTA path supplied to `./bwa-mem2 mem` must be the same
-> one used in Step 3 : BWA-MEM2 looks for its index files (`.0123`, `.pac`
+> one used in Step 3 — BWA-MEM2 looks for its index files (`.0123`, `.pac`
 > etc.) in the same directory as the FASTA.
 
 ---
@@ -157,115 +155,180 @@ RosaSeed requires two separate indexes:
 
 ---
 
-## Build flags reference
+## Flags reference
 
-These `-D` flags are passed via `CPPFLAGS_EXTRA` at build time.
-
-### Jump table size
-
-| Flag | Entries | Size | Description |
-|---|---|---|---|
-| `-DLOAD_JTABLE_14nt` | 268M | 2 GiB | 14-mer table (default) |
-| `-DLOAD_JTABLE_15nt` | 1.07B | 8 GiB | 15-mer table |
-| `-DLOAD_JTABLE_16nt` | 4.29B | 32 GiB | 16-mer table |
-
-Use exactly one per build.
-
-### SA compression factor
-
-| Flag | CF | SA size | Description |
-|---|---|---|---|
-| `-DSA_COMPRESSION_FACTOR_POWER=0` | 1 | ~29 GB | Full SA |
-| `-DSA_COMPRESSION_FACTOR_POWER=1` | 2 | ~15 GB | Half SA |
-| `-DSA_COMPRESSION_FACTOR_POWER=2` | 4 | ~7.3 GB | Quarter SA |
-| `-DSA_COMPRESSION_FACTOR_POWER=3` | 8 | ~3.6 GB | Eighth SA  |
-
-### Other flags
-
-| Flag | Description |
-|---|---|
-| `-DENABLE_F_RC_CHOICE` | Try both strands at first pivot, pick smallest one |
-| `-DGAPFILL_ALWAYS_RUN_BOTH_STRANDS` | Run gap fill on both strands |
-| `-DGAPFILL_EARLY_EXIT` | Exit gap fill early when gap is covered |
-| `-DROSASEED_PRECHAIN_SINGLETON_SUPPRESS` | Suppress singleton seeds before chaining |
-| `-DROSASEED_PRECHAIN_TRIGGER=N` | Apply pre-chain filter when seed count > N |
-| `-DROSASEED_PRECHAIN_WEAK_LEN=N` | Seeds shorter than N bp treated as weak |
-
-## Runtime flags
-
-| Flag | Description |
-|---|---|
-| `-t <int>` | Number of threads |
-| `-k <int>` | Minimum seed length (recommended: 19) |
-| `--rs-index <dir>` | Path to RosaSeed index directory |
-| `--rs-cap <int>` | Maximum seed interval size to extend (recommended: 2000) |
+RosaSeed is controlled through two mechanisms:
+- **Build-time flags** (`-D` flags via `CPPFLAGS_EXTRA`) — select algorithms and data structures at compile time
+- **Runtime flags** (`--rs-*` and standard BWA-MEM2 flags) — tune thresholds at run time
 
 ---
 
-### Recommended configurations
+### Build-time flags (`CPPFLAGS_EXTRA`)
 
-**Recommended default configuration:**
-```bash
-CPPFLAGS_EXTRA=" \
-  -DLOAD_JTABLE_14nt \
-  -DENABLE_F_RC_CHOICE \
-  -DSA_COMPRESSION_FACTOR_POWER=1 \
-  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
-  -DGAPFILL_EARLY_EXIT \
-  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
-  -DROSASEED_PRECHAIN_TRIGGER=200 \
-  -DROSASEED_PRECHAIN_WEAK_LEN=60"
-```
-Use the alignment command as:
-```
-./bwa-mem2 mem \
-    -t 1 \
-    -k 19 \
-    --rs-index index-builder/index/<genome_name>/ \
-    --rs-cap 2000 \
-    /path/to/genome.fna \
-    reads_R1.fastq.gz \
-    > output.sam
-```
+#### Jump table size
 
-**Memory-efficient:**
-```bash
-CPPFLAGS_EXTRA=" \
-  -DLOAD_JTABLE_14nt \
-  -DENABLE_F_RC_CHOICE \
-  -DSA_COMPRESSION_FACTOR_POWER=3 \
-  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
-  -DGAPFILL_EARLY_EXIT \
-  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
-  -DROSASEED_PRECHAIN_TRIGGER=200 \
-  -DROSASEED_PRECHAIN_WEAK_LEN=60"
-```
+Controls which pre-computed k-mer jump table is loaded into memory.
+The jump table maps a k-nucleotide pattern directly to its BWT interval,
+initialising Phase A seeding without any FM-index steps.
+Exactly **one** of these must be set per build.
 
-**miniRosaSeed (reduced aggressiveness, benchmarked vs minibwa):**
-```bash
-CPPFLAGS_EXTRA=" \
-  -DLOAD_JTABLE_14nt \
-  -DENABLE_F_RC_CHOICE \
-  -DSA_COMPRESSION_FACTOR_POWER=1 \
-  -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
-  -DGAPFILL_EARLY_EXIT \
-  -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
-  -DROSASEED_PRECHAIN_TRIGGER=50 \
-  -DROSASEED_PRECHAIN_WEAK_LEN=60"
-```
-Use the alignment command as:
-```
-./bwa-mem2 mem \
-    -t 1 \
-    -k 19 \
-    --rs-index index-builder/index/<genome_name>/ \
-    --rs-cap 50 \
-    /path/to/genome.fna \
-    reads_R1.fastq.gz \
-    > output.sam
-```
+| Flag | k-mer | Entries | Memory | 
+|---|---|---|---|---|
+| `-DLOAD_JTABLE_14nt` | 14 nt (7 base-16 pairs) | 268M | 2 GB |
+| `-DLOAD_JTABLE_15nt` | 15 nt (7 pairs + 1 NT) | 1.07B | 8 GB | 
+| `-DLOAD_JTABLE_16nt` | 16 nt (8 base-16 pairs) | 4.29B | 32 GB |
+
+The jump table must be built to match the flag:
+`index-builder/build_2step_pipeline.sh -j 14` (default), `-j 15`, or `-j 16`.
+
 ---
 
+#### SA compression factor
+
+Controls how densely the suffix array (SA) is sampled on disk and in memory.
+Higher compression = less memory, slower non-unique seed position lookup
+(requires LF-mapping walk to reach the nearest sampled entry).
+
+| Flag | CF | SA files used | Memory (T2T) | Notes |
+|---|---|---|---|---|
+| `-DSA_COMPRESSION_FACTOR_POWER=0` | 1 | `sa_*_cf1.bin` | ~29 GB | Full SA. Direct O(1) lookup. |
+| `-DSA_COMPRESSION_FACTOR_POWER=1` | 2 | `sa_*_cf2.bin` | ~15 GB | Recommended. At most 1 LF step. |
+| `-DSA_COMPRESSION_FACTOR_POWER=2` | 4 | `sa_*_cf4.bin` | ~7.3 GB | At most 3 LF steps. |
+| `-DSA_COMPRESSION_FACTOR_POWER=3` | 8 | `sa_*_cf8.bin` | ~3.6 GB | Lowest memory. At most 7 LF steps. |
+
+All CF files are generated automatically by the index builder regardless of
+this setting. Only the matching pair is loaded at runtime.
+
+---
+
+#### Phase A: strand selection
+
+| Flag | Description |
+|---|---|
+| `-DENABLE_F_RC_CHOICE` | At the very first pivot of every read, look up the jump table for **both** the forward and reverse-complement read pattern and select whichever gives the smaller (more specific) BWT interval. Costs one extra jump table lookup per pivot but improves seed specificity and is recommended. Omitting this flag always seeds on the forward strand. |
+
+---
+
+#### Phase B vs Phase C selection
+
+RosaSeed has two modes for finding seeds missed by Phase A. Only one is active per build.
+
+| Flag | Mode | Description |
+|---|---|---|
+| *(not set)* | **Phase C** (default) | Gap-aware adaptive recovery: sorts Phase A seeds by read position, finds uncovered gaps, and runs targeted searches inside those gaps. |
+| `-DENABLE_PHASE_II` | **Phase B** | Fixed-pivot supplementary seeding: places `g_num_pivots_B` evenly-spaced pivots across the read and runs full backward searches from each. Simpler but less targeted than Phase C. |
+
+---
+
+#### Phase C: gap-fill configuration
+
+These flags apply when `ENABLE_PHASE_II` is **not** set (i.e., the default Phase C path).
+
+| Flag | Description |
+|---|---|
+| `-DGAPFILL_ALWAYS_RUN_BOTH_STRANDS` | Inside each detected coverage gap, run seed searches on **both** forward and RC strands, not just the strand chosen by Phase A. Increases recall in repetitive or ambiguous regions at a modest compute cost. |
+| `-DGAPFILL_EARLY_EXIT` | Stop gap-filling as soon as a seed of sufficient length and specificity is found covering the gap. Without this flag, all pivot positions in the gap are tried exhaustively. Recommended: improves speed with negligible accuracy impact. |
+
+---
+
+#### Pre-chain filtering
+
+After Phase A (and Phase B or C), seeds are passed to the BWA-MEM2 chaining
+stage. Pre-chain filtering optionally suppresses weak seeds before chaining
+to reduce chaining overhead on reads with many low-quality hits.
+
+| Flag | Description |
+|---|---|
+| `-DROSASEED_PRECHAIN_SINGLETON_SUPPRESS` | When a read produces more than `ROSASEED_PRECHAIN_TRIGGER` seeds, suppress seeds shorter than `ROSASEED_PRECHAIN_WEAK_LEN` bp that have no neighbouring seed to chain with (singletons). Has no effect below the trigger threshold. |
+| `-DROSASEED_PRECHAIN_TRIGGER=N` | Seed count threshold above which singleton suppression activates. Default: 200. Lower values suppress more aggressively. The miniRosaSeed configuration uses 50. |
+| `-DROSASEED_PRECHAIN_WEAK_LEN=N` | Seeds shorter than N bp are considered weak candidates for suppression. Default: 60. Only seeds below this length AND satisfying the singleton condition are suppressed. |
+
+---
+
+### Runtime flags
+
+These are passed on the command line at alignment time and can be tuned
+without recompilation.
+
+#### RosaSeed-specific runtime flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--rs-index <dir>` | *(required)* | Path to the RosaSeed index directory produced by `build_2step_pipeline.sh`. Must contain `cp_occ_full.bin`, `c_vector.txt`, `ref16_packed.bin`, the SA split files, and the jump table. |
+| `--rs-cap <int>` | 2000 | Phase A interval cap. Seeds whose BWT interval width exceeds this value are skipped in Phase A (too repetitive to be useful). Lower values run faster but may miss seeds in repetitive regions. Recommended: 2000 for standard use, 50 for miniRosaSeed. |
+
+#### Inherited BWA-MEM2 runtime flags (relevant to RosaSeed)
+
+| Flag | Default | Description |
+|---|---|---|
+| `-t <int>` | 1 | Number of alignment threads. RosaSeed is fully multi-threaded - each thread runs its own Phase A/C pipeline independently. |
+| `-k <int>` | 19 | Minimum seed length in nucleotides. Seeds shorter than this are not emitted by Phase A. Phase B/C use `k+1` as their threshold. |
+
+---
+
+## Recommended configurations
+
+### Standard (recommended default)
+
+Best for most use cases. Balances accuracy and speed.
+
+```bash
+make arch=native CXX=g++ ROSASEED=1 \
+  CPPFLAGS_EXTRA=" \
+    -DLOAD_JTABLE_14nt \
+    -DENABLE_F_RC_CHOICE \
+    -DSA_COMPRESSION_FACTOR_POWER=1 \
+    -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
+    -DGAPFILL_EARLY_EXIT \
+    -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+    -DROSASEED_PRECHAIN_TRIGGER=200 \
+    -DROSASEED_PRECHAIN_WEAK_LEN=60"
+
+./bwa-mem2 mem -t 20 -k 19 --rs-index index-builder/index/<name>/ \
+    --rs-cap 2000 genome.fna reads.fastq.gz > output.sam
+```
+
+### Memory-efficient
+
+Reduces index memory to ~35 GB by using 8× SA compression.
+Suitable for systems with 48 GB RAM.
+
+```bash
+make arch=native CXX=g++ ROSASEED=1 \
+  CPPFLAGS_EXTRA=" \
+    -DLOAD_JTABLE_14nt \
+    -DENABLE_F_RC_CHOICE \
+    -DSA_COMPRESSION_FACTOR_POWER=3 \
+    -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
+    -DGAPFILL_EARLY_EXIT \
+    -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+    -DROSASEED_PRECHAIN_TRIGGER=200 \
+    -DROSASEED_PRECHAIN_WEAK_LEN=60"
+```
+
+### miniRosaSeed
+
+Reduced-aggressiveness configuration benchmarked against minibwa.
+Achieves 2.08× end-to-end speedup over minibwa at single thread
+with 2.581 percentage points higher standard accuracy.
+
+```bash
+make arch=native CXX=g++ ROSASEED=1 \
+  CPPFLAGS_EXTRA=" \
+    -DLOAD_JTABLE_14nt \
+    -DENABLE_F_RC_CHOICE \
+    -DSA_COMPRESSION_FACTOR_POWER=1 \
+    -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
+    -DGAPFILL_EARLY_EXIT \
+    -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+    -DROSASEED_PRECHAIN_TRIGGER=50 \
+    -DROSASEED_PRECHAIN_WEAK_LEN=60"
+
+./bwa-mem2 mem -t 1 -k 19 --rs-index index-builder/index/<name>/ \
+    --rs-cap 50 genome.fna reads.fastq.gz > output.sam
+```
+
+---
 ## Key results
 
 Compared against BWA-MEM2, Minimap2, Bowtie2, and the Enumerated Radix
@@ -273,13 +336,13 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 
 | Comparison | Seed processing speedup | Total alignment speedup |
 |---|---|---|
-| vs BWA-MEM2 | **15.0×** | **3.84×** |
+| vs BWA-MEM2 | **15.0×** | **4.04×** |
 | vs ERT | 4.0× | 2.48× |
 | vs ERT2 | 1.2× | 1.44× |
 | vs Minimap2 | 4.8× | 2.48× |
 | vs Bowtie2 | 33.2× | 10.8× |
 
-Peak memory: **49.61 GB** which is ~25% less than ERT/ERT2 (~66.3 GB each).
+Peak memory: **49.61 GB** — ~25% less than ERT/ERT2 (~66.3 GB each).
 This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
 index files (~6.9 GB) required by the downstream chaining and alignment
 extension pipeline.
@@ -297,6 +360,22 @@ environments while maintaining alignment accuracy comparable to BWA-MEM2.
 
 ---
 
+### Downstream pipeline (BWA-MEM2)
+
+After seeding, RosaSeed converts seed positions from s-step reference
+coordinates back to BWA-MEM2's global coordinate space and hands them
+to the standard BWA-MEM2 chaining and alignment pipeline:
+
+- **Chaining** (`mem_chain_preexpanded_hits`): uses `bns` (chromosome table from BWA-MEM2 index) to assign seeds to chromosomes and group them into chains
+- **Chain filtering** (`mem_flt_chained_seeds`): uses `pac` (packed reference sequence from BWA-MEM2 index) for Smith-Waterman scoring of short seeds
+- **Alignment extension** (`mem_chain2aln`, `bwa_gen_cigar2`): uses `pac` and `bns` to produce CIGAR strings
+- **SAM output** (`mem_reg2sam`, `mem_aln2sam`): uses `bns->anns[].name` for chromosome names
+
+This is why both the RosaSeed index (`--rs-index`) and the BWA-MEM2 index
+(`.0123`, `.pac`, `.amb`, `.ann`, `.bwt.2bit.64` files) are required.
+
+---
+
 ## Citation
 
 If you use RosaSeed in your research, please cite:
@@ -310,13 +389,14 @@ Please also cite the original BWA-MEM2:
 > Vasimuddin Md, Sanchit Misra, Heng Li, Srinivas Aluru. Efficient
 > Architecture-Aware Acceleration of BWA-MEM for Multicore Systems.
 > IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019.
-> doi:https://doi.org/10.1109/IPDPS.2019.00041
+> doi:10.1109/IPDPS.2019.00041
 
 If you use gsufsort for index building, please cite:
 
-> Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.. gsufsort: 
-> constructing suffix arrays, LCP arrays and BWTs for string collections. 
-> Algorithms Mol Biol 15, 18 (2020). https://doi.org/10.1186/s13015-020-00177-y
+> Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.
+> gsufsort: constructing suffix arrays, LCP arrays and BWTs for string collections.
+> Algorithms Mol Biol 15, 18 (2020). doi:10.1186/s13015-020-00177-y
+
 ---
 
 ## Acknowledgements
@@ -324,7 +404,7 @@ If you use gsufsort for index building, please cite:
 RosaSeed is built on [BWA-MEM2](https://github.com/bwa-mem2/bwa-mem2)
 by Vasimuddin Md, Sanchit Misra, Heng Li, and Chirag Jain.
 RosaSeed uses [gsufsort](https://github.com/felipelouza/gsufsort)
-by Louza et al., to construct SA and BWT during index construction.
+by Louza et al. to construct SA and BWT during index construction.
 
 ---
 
@@ -336,7 +416,7 @@ Copyright (c) 2026 Shyama Gandhi, University of Alberta.
 BWA-MEM2 components: MIT License.
 Copyright (c) 2019 Vasimuddin Md, Sanchit Misra, Heng Li, Chirag Jain.
 
-See [LICENSE](LICENSE) for full text.
-
-gsufsort: GPL-3.0 License
+gsufsort: GPL-3.0 License.
 Copyright (c) 2020 Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.
+
+See [LICENSE](LICENSE) for full text.
