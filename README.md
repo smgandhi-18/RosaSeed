@@ -183,7 +183,7 @@ The jump table must be built to match the flag:
 
 ---
 
-#### SA compression factor
+#### SA Compression Factor (CF)
 
 Controls how densely the suffix array (SA) is sampled on disk and in memory.
 Higher compression = less memory, slower non-unique seed position lookup
