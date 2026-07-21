@@ -650,7 +650,7 @@ static void usage(const mem_opt_t *opt)
 #ifdef ROSASEED_INPROCESS
     fprintf(stderr, "RosaSeed in-process options:\n");
     fprintf(stderr, "   --rs-index STR        RosaSeed index directory [required]\n");
-    fprintf(stderr, "   --rs-cap INT          RosaSeed Phase-I cap [5000]\n");
+    fprintf(stderr, "   --rs-cap INT          RosaSeed Phase-I cap [2000]\n");
     fprintf(stderr, "   --rs-gap INT          RosaSeed gap threshold [5]\n");
     fprintf(stderr, "   --rs-pivots-b INT     RosaSeed Phase-B pivots [3]\n");
     fprintf(stderr, "   --rs-gap-step INT     RosaSeed gap-left step [4]\n");
@@ -686,7 +686,7 @@ int main_mem(int argc, char *argv[])
 #ifdef ROSASEED_INPROCESS
     const char *rs_index_dir = NULL;
 
-    int rs_phase1_cap = 5000;
+    int rs_phase1_cap = 2000;
     int rs_gap_threshold = 5;
     int rs_num_pivots_B = 3;
     int rs_gap_left_step = 4;

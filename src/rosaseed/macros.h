@@ -134,7 +134,7 @@ typedef struct smem_struct
  * 3 = CF=8  (sample every 8th entry)
  ***************************************/
 #ifndef SA_COMPRESSION_FACTOR_POWER
-    #define SA_COMPRESSION_FACTOR_POWER 0   // default: uncompressed
+    #define SA_COMPRESSION_FACTOR_POWER 1   // default: CF=1
 #endif
 
 // SA_INDEX_AND_SAMPLE: bitmask to test if a row is sampled
