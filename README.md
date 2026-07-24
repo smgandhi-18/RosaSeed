@@ -233,15 +233,28 @@ These flags apply when `ENABLE_PHASE_II` is **not** set (i.e., the default Phase
 
 #### Pre-chain filtering
 
-After Phase A (and Phase B or C), seeds are passed to the BWA-MEM2 chaining
-stage. Pre-chain filtering optionally suppresses weak seeds before chaining
-to reduce chaining overhead on reads with many low-quality hits.
+After Phase A and the selected supplementary seeding stage (Phase B or
+Phase C), RosaSeed converts the generated hits into BWA-MEM2-compatible
+seed records and passes them to chain construction. The optional
+pre-chain singleton suppression filter prevents selected weak candidates
+from initiating new singleton chains, thereby reducing downstream
+chaining and alignment-extension work.
 
-| Flag | Description |
-|---|---|
-| `-DROSASEED_PRECHAIN_SINGLETON_SUPPRESS` | When a read produces more than `ROSASEED_PRECHAIN_TRIGGER` seeds, suppress seeds shorter than `ROSASEED_PRECHAIN_WEAK_LEN` bp that have no neighbouring seed to chain with (singletons). Has no effect below the trigger threshold. |
-| `-DROSASEED_PRECHAIN_TRIGGER=N` | Seed count threshold above which singleton suppression activates. Default: 200. Lower values suppress more aggressively. The miniRosaSeed configuration uses 50. |
-| `-DROSASEED_PRECHAIN_WEAK_LEN=N` | Seeds shorter than N bp are considered weak candidates for suppression. Default: 60. Only seeds below this length AND satisfying the singleton condition are suppressed. |
+Two filtering modes are supported:
+
+* **SSF** suppresses weak singleton candidates based on the number of
+  chains already created for the read and the candidate seed length.
+* **SSF+A** additionally considers seed abundance, retaining short,
+  relatively specific candidates while preferentially suppressing short,
+  highly repetitive candidates.
+
+| Flag                                     | Description                                                                                                                                                                                                                                                                 |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-DROSASEED_PRECHAIN_SINGLETON_SUPPRESS` | Enables the pre-chain singleton suppression filter (SSF). The filter is evaluated only when a candidate seed cannot be merged into an existing chain and would otherwise initiate a new singleton chain.                                                                    |
+| `-DROSASEED_PRECHAIN_TRIGGER=N`          | Existing-chain-count threshold above which singleton suppression becomes active. Suppression is applied when the number of chains already created for the read is strictly greater than `N`. Default: `200`. Lower values activate suppression earlier.                     |
+| `-DROSASEED_PRECHAIN_WEAK_LEN=N`         | Seed-length threshold used to classify weak singleton candidates. Candidates shorter than `N` nt may be suppressed when the other filtering conditions are satisfied. Default: `60`.                                                                                        |
+| `-DROSASEED_PRECHAIN_USE_ABUNDANCE`      | Enables the abundance-aware variant (SSF+A). This option is meaningful only when `ROSASEED_PRECHAIN_SINGLETON_SUPPRESS` is enabled. A weak singleton candidate is suppressed only when its occurrence count is also greater than or equal to `ROSASEED_PRECHAIN_ABUNDANCE`. |
+| `-DROSASEED_PRECHAIN_ABUNDANCE=N`        | Seed-abundance threshold used by SSF+A. Weak singleton candidates with occurrence count `>= N` are treated as highly repetitive and suppressed. Default: `500`.                                                                                                             |
 
 ---
 
