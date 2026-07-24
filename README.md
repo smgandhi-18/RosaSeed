@@ -1,6 +1,11 @@
 # RosaSeed
 
-**RosaSeed** is a fast and accurate configurable seeding engine for short-read DNA
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)
+![Language](https://img.shields.io/badge/C%2B%2B-C%2B%2B14-blue.svg)
+![Architecture](https://img.shields.io/badge/CPU-AVX2-orange.svg)
+
+**RosaSeed** is a configurable, fast, and accurate seeding engine for short-read DNA
 sequence alignment. It replaces the BWA-MEM2 seeding kernel and feeds
 candidate seeds directly into the existing BWA-MEM2 chaining and alignment
 extension pipeline, producing standard SAM output compatible with downstream
@@ -14,6 +19,10 @@ variant analysis tools.
 
 ```
 RosaSeed/
+├── preprocessing/           FASTQ preprocessing scripts
+├── evaluation/              Accuracy evaluation scripts
+│   ├── evaluate_alignments.py
+│   └── README.md
 ├── src/
 │   ├── rosaseed/            RosaSeed seeding algorithm
 │   │   ├── rosaseed_phaseA.c
@@ -36,6 +45,7 @@ RosaSeed/
 ├── Makefile
 ├── LICENSE
 └── README.md
+└── README-bwamem2.md
 ```
 
 ---
@@ -222,8 +232,8 @@ RosaSeed has two modes for finding seeds missed by Phase A. Only one is active p
 
 #### Phase C: gap-fill configuration
 
-These flags apply when `ENABLE_PHASE_II` is **not** set (i.e., the default Phase C path).
-And, these options are ignored when `ENABLE_PHASE_II` is enabled.
+These flags apply when `ENABLE_PHASE_II` is **not**  set (i.e., the default Phase C path). 
+They are ignored when `ENABLE_PHASE_II` is enabled.
 
 | Flag | Description |
 |---|---|
