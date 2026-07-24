@@ -4,7 +4,9 @@
 [![Paper](https://img.shields.io/badge/Paper-bioRxiv-red.svg)](https://doi.org/...)
 
 ![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)
-![Language](https://img.shields.io/badge/C%2B%2B-C%2B%2B14-blue.svg)
+![C](https://img.shields.io/badge/C-C11-blue.svg)
+![C++](https://img.shields.io/badge/C%2B%2B-C%2B%2B14-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.x-yellow.svg)
 
 **RosaSeed** is a configurable, fast, and accurate seeding engine for short-read DNA
 sequence alignment. It replaces the BWA-MEM2 seeding kernel and feeds
