@@ -1,6 +1,6 @@
 # RosaSeed
 
-**RosaSeed** is a fast, configurable seeding algorithm for short-read DNA
+**RosaSeed** is a fast and accurate configurable seeding engine for short-read DNA
 sequence alignment. It replaces the BWA-MEM2 seeding kernel and feeds
 candidate seeds directly into the existing BWA-MEM2 chaining and alignment
 extension pipeline, producing standard SAM output compatible with downstream
@@ -169,7 +169,7 @@ RosaSeed is controlled through two mechanisms:
 
 Controls which pre-computed k-mer jump table is loaded into memory.
 The jump table maps a k-nucleotide pattern directly to its BWT interval,
-initialising Phase A seeding without any FM-index steps.
+allowing Phase A seeding to begin without an FM-index backward search.
 Exactly **one** of these must be set per build.
 
 | Flag | k-mer | Entries | Memory |
@@ -209,7 +209,7 @@ this setting. Only the matching pair is loaded at runtime.
 
 ---
 
-#### Phase B vs Phase C selection
+#### Supplementary seeding strategy selection
 
 RosaSeed has two modes for finding seeds missed by Phase A. Only one is active per build.
 
@@ -223,6 +223,7 @@ RosaSeed has two modes for finding seeds missed by Phase A. Only one is active p
 #### Phase C: gap-fill configuration
 
 These flags apply when `ENABLE_PHASE_II` is **not** set (i.e., the default Phase C path).
+And, these options are ignored when `ENABLE_PHASE_II` is enabled.
 
 | Flag | Description |
 |---|---|
@@ -242,7 +243,7 @@ chaining and alignment-extension work.
 
 Two filtering modes are supported:
 
-* **SSF** suppresses weak singleton candidates based on the number of
+* **SSF** suppresses weak singleton-chain candidates based on the number of
   chains already created for the read and the candidate seed length.
 * **SSF+A** additionally considers seed abundance, retaining short,
   relatively specific candidates while preferentially suppressing short,
@@ -268,7 +269,7 @@ without recompilation.
 | Flag | Default | Description |
 |---|---|---|
 | `--rs-index <dir>` | *(required)* | Path to the RosaSeed index directory produced by `build_2step_pipeline.sh`. Must contain `cp_occ_full.bin`, `c_vector.txt`, `ref16_packed.bin`, the SA split files, and the jump table. |
-| `--rs-cap <int>` | 2000 | Phase A interval cap. Seeds whose BWT interval width exceeds this value are skipped in Phase A (too repetitive to be useful). Lower values run faster but may miss seeds in repetitive regions. Recommended: 2000 for standard use, 50 for miniRosaSeed. |
+| `--rs-cap <int>` | 2000 | Phase A SA interval cap. Seeds whose BWT interval width exceeds this value are skipped in Phase A (too repetitive to be useful). Lower values run faster but may miss seeds in repetitive regions. Recommended: 2000 for standard use, 50 for miniRosaSeed. |
 
 #### Inherited BWA-MEM2 runtime flags (relevant to RosaSeed)
 
