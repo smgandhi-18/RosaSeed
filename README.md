@@ -394,7 +394,7 @@ This is why both the RosaSeed index (`--rs-index`) and the BWA-MEM2 index
 If you use RosaSeed in your research, please cite:
 
 > Gandhi Shyama, Cockburn Bruce (2026). RosaSeed: A Configurable Seeding Framework 
-> for Fast and Accurate Short-Read Alignment
+> for Fast and Accurate Short-Read Alignment, 2026, 
 > University of Alberta.
 
 Please also cite the original BWA-MEM2:
