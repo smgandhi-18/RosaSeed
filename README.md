@@ -349,7 +349,7 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 
 | Comparison | Seed processing speedup | Total alignment speedup |
 |---|---|---|
-| vs BWA-MEM2 | **15.0×** | **4.04×** |
+| vs BWA-MEM2 (SA cf=8) | **15.0×** | **4.04×** |
 | vs ERT | 4.0× | 2.48× |
 | vs ERT2 | 1.2× | 1.44× |
 | vs Minimap2 | 4.8× | 2.48× |
