@@ -172,10 +172,10 @@ The jump table maps a k-nucleotide pattern directly to its BWT interval,
 initialising Phase A seeding without any FM-index steps.
 Exactly **one** of these must be set per build.
 
-| Flag | k-mer | Entries | Memory | 
-|---|---|---|---|---|
+| Flag | k-mer | Entries | Memory |
+|------|-------|---------|--------|
 | `-DLOAD_JTABLE_14nt` | 14 nt (7 base-16 pairs) | 268M | 2 GB |
-| `-DLOAD_JTABLE_15nt` | 15 nt (7 pairs + 1 NT) | 1.07B | 8 GB | 
+| `-DLOAD_JTABLE_15nt` | 15 nt (7 pairs + 1 NT) | 1.07B | 8 GB |
 | `-DLOAD_JTABLE_16nt` | 16 nt (8 base-16 pairs) | 4.29B | 32 GB |
 
 The jump table must be built to match the flag:
