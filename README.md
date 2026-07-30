@@ -378,7 +378,7 @@ On a separate AMD Zen3 workstation, the reduced-aggressiveness
 **miniRosaSeed** configuration achieves a **2.08× end-to-end speedup**
 over minibwa at single-thread execution while attaining
 **2.581 percentage points higher standard accuracy**, remaining faster
-and more accurate simultaneously up to ~28 threads.
+and more accurate simultaneously up to ~26 threads.
 
 RosaSeed exposes multiple runtime-memory operating configurations
 spanning memory-efficient and high-performance designs, enabling users
@@ -399,7 +399,7 @@ to the standard BWA-MEM2 chaining and alignment pipeline:
 - **SAM output** (`mem_reg2sam`, `mem_aln2sam`): uses `bns->anns[].name` for chromosome names
 
 This is why both the RosaSeed index (`--rs-index`) and the BWA-MEM2 index
-(`.0123`, `.pac`, `.amb`, `.ann`, `.bwt.2bit.64` files) are required.
+(`.0123`, `.pac` files) are required.
 
 ---
 
@@ -422,7 +422,7 @@ If you use gsufsort for index building, please cite:
 
 > Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.
 > gsufsort: constructing suffix arrays, LCP arrays and BWTs for string collections.
-> Algorithms Mol Biol 15, 18 (2020). doi:10.1186/s13015-020-00177-y
+> Algorithms Mol Biol 15, 18 (2020). (https://link.springer.com/article/10.1186/s13015-020-00177-y)
 
 ---
 
