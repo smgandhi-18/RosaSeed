@@ -409,20 +409,21 @@ If you use RosaSeed in your research, please cite:
 
 > Gandhi Shyama, Cockburn Bruce (2026). RosaSeed: A Configurable Seeding Framework 
 > for Fast and Accurate Short-Read Alignment, 2026, 
-> University of Alberta.
+> University of Alberta. URL: 
 
 Please also cite the original BWA-MEM2:
 
 > Vasimuddin Md, Sanchit Misra, Heng Li, Srinivas Aluru. Efficient
 > Architecture-Aware Acceleration of BWA-MEM for Multicore Systems.
 > IEEE Parallel and Distributed Processing Symposium (IPDPS), 2019.
-> doi:10.1109/IPDPS.2019.00041
+> URL: https://ieeexplore.ieee.org/document/8820962 
 
 If you use gsufsort for index building, please cite:
 
 > Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.
 > gsufsort: constructing suffix arrays, LCP arrays and BWTs for string collections.
-> Algorithms Mol Biol 15, 18 (2020). (https://link.springer.com/article/10.1186/s13015-020-00177-y)
+> Algorithms Mol Biol 15, 18 (2020).
+> URL: https://link.springer.com/article/10.1186/s13015-020-00177-y
 
 ---
 
