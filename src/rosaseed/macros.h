@@ -34,7 +34,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #include <stdint.h>
 #include <stdbool.h>
 
-#define ENABLE_F_RC_CHOICE
+//#define ENABLE_F_RC_CHOICE
 #define MATCH_ARRAY_CAPACITY  512
 
 /********************************************************************************
@@ -128,13 +128,13 @@ typedef struct smem_struct
 /***************************************
  * SUFFIX ARRAY COMPRESSION
  * Set via -DSA_COMPRESSION_FACTOR_POWER=N
- * 0 = CF=1 (uncompressed, default)
- * 1 = CF=2  (sample every 2nd entry)
+ * 0 = CF=1 (uncompressed)
+ * 1 = CF=2  (sample every 2nd entry, default)
  * 2 = CF=4  (sample every 4th entry)
  * 3 = CF=8  (sample every 8th entry)
  ***************************************/
 #ifndef SA_COMPRESSION_FACTOR_POWER
-    #define SA_COMPRESSION_FACTOR_POWER 1   // default: CF=1
+    #define SA_COMPRESSION_FACTOR_POWER 1   // default: CF=2
 #endif
 
 // SA_INDEX_AND_SAMPLE: bitmask to test if a row is sampled
