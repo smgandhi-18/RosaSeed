@@ -121,8 +121,6 @@ typedef struct smem_struct
     #define JT_LEN_NT       14   // default — also covers fallback in file_dec_new.h
 #endif
 
-#define JT_PAIRS        (JT_LEN_NT / 2)
-#define JT_TAIL_SINGLE  (JT_LEN_NT & 1)   // 1 for 15nt (odd), 0 for 14/16nt
 #define KMER_BASES      JT_LEN_NT
 
 /***************************************
