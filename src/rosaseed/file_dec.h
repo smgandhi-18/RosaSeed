@@ -136,6 +136,7 @@ typedef struct __attribute__((aligned(64))) {
 extern cp_occ32_t *cp_occ;     // [num_blocks]
 extern uint32_t   *mask32;     // [33] prefix masks for 32-bit windows
 
+#define RS_OCC_VERSION 1u
 #define RS_OCC_MAGIC 0x52534F434346554CULL   /* "RSOCCFUL" — must match make_cp_occ_2step.c */
 
 typedef struct {
