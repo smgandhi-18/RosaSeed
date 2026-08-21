@@ -48,7 +48,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #include <ctype.h>
 
 extern uint32_t no_of_jumps, _jtable_string_length;
-extern int sentinel_index;
+extern int64_t sentinel_index;
 
 void load_bwt_data_structures();
 

@@ -44,7 +44,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #include <time.h>
 
 uint32_t no_of_jumps, _jtable_string_length;
-int sentinel_index = 0;
+int64_t sentinel_index = 0;
 
 // Implement in load_data_mmap.c (it already opens cp_occ header anyway):
 void rosaseed_read_index_metadata(const char *index_dir) {
@@ -231,7 +231,7 @@ static uint64_t load_occ_full_binary_mmap(const char *path)
     if (cp_occ) { _mm_free(cp_occ); cp_occ = NULL; }
     cp_occ = (cp_occ32_t *)mapped;
 
-    sentinel_index = (int)hdr.sentinel_index;
+    sentinel_index = hdr.sentinel_index;
 
     fprintf(stderr,
         "Full OCC+BWT bitmaps loaded: bwt_non_dollar=%llu total=%llu "
@@ -363,13 +363,16 @@ void load_bwt_data_structures(void)
     }
 
     /* Sentinel scan */
-    for (size_t v = 0; v < sa_n; ++v) {
-        if (sa_ls_word[v] == 0 && sa_ms_byte[v] == 0) {
-            sentinel_index = (int)((uint64_t)v << SA_COMPRESSION_FACTOR_POWER);
-            break;
+    if(sentinel_index <0){
+        for (size_t v = 0; v < sa_n; ++v) {
+            if (sa_ls_word[v] == 0 && sa_ms_byte[v] == 0) {
+                sentinel_index = (int64_t)((uint64_t)v << SA_COMPRESSION_FACTOR_POWER);
+                break;
+            }
         }
     }
-    fprintf(stderr, "SA loaded: %zu sampled entries (CF=%d), sentinel=%d\n",
+    
+    fprintf(stderr, "SA loaded: %zu sampled entries (CF=%d), sentinel=%ld\n",
             sa_n, 1 << SA_COMPRESSION_FACTOR_POWER, sentinel_index);
 
     clock_gettime(CLOCK_MONOTONIC, &wall_t1);
@@ -406,13 +409,13 @@ static void load_sa_binary(const char *path_ls, const char *path_msb)
     fclose(f32); fclose(f8);
     for (size_t v = 0; v < sa_n; v++) {
         if (sa_ls_word[v] == 0 && sa_ms_byte[v] == 0) {
-            sentinel_index = (int)(v << SA_COMPRESSION_FACTOR_POWER);
+            sentinel_index = (int64_t)(v << SA_COMPRESSION_FACTOR_POWER);
             break;
         }
     }
     fprintf(stderr, "SA loaded from binary: %zu sampled entries (CF=%d)\n",
             sa_n, 1 << SA_COMPRESSION_FACTOR_POWER);
-    fprintf(stderr, "Sentinel index: %d\n", sentinel_index);
+    fprintf(stderr, "Sentinel index: %ld\n", sentinel_index);
 }
 
 static uint64_t load_occ_full_binary(const char *path)
@@ -445,7 +448,7 @@ static uint64_t load_occ_full_binary(const char *path)
         exit(EXIT_FAILURE);
     }
     fclose(f);
-    sentinel_index = (int)hdr.sentinel_index;
+    sentinel_index = hdr.sentinel_index;
     fprintf(stderr,
         "Full OCC+BWT bitmaps loaded: bwt_non_dollar=%llu total=%llu "
         "blocks=%llu sentinel=%lld\n",
@@ -455,3 +458,4 @@ static uint64_t load_occ_full_binary(const char *path)
         (long long)hdr.sentinel_index);
     return hdr.bwt_len_non_dollar;
 }
+
