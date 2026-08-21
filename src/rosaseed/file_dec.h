@@ -177,7 +177,7 @@ static inline void build_masks32(void) {
     uint64_t _blk = (pos) >> 5;           /* /32 */               \
     uint32_t _off = (pos) & 31;           /* %32 */               \
     uint32_t _acc = cp_occ[_blk].cp_count[(sym)];                 \
-    uint32_t prefix_mask = (uint32_t)(-(int32_t)(_off != 0)) & (~0u << (32 - _off)); \
+    uint32_t prefix_mask = _off ? (~0u << (32 - _off)) : 0u; \
     uint32_t _bits= cp_occ[_blk].one_hot[(sym)] & prefix_mask;   \
     (out) = (uint64_t)_acc + (uint64_t)POPCOUNT32(_bits);         \
 } while(0)
