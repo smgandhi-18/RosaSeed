@@ -58,7 +58,6 @@
 #define WRITE_BUF_BLKS (8192)                 /* blocks per write   */
 #define REPORT_EVERY   500000000ULL           /* progress interval  */
 
-/* ── magic + version (matches load_data.c) ── */
 #define RS_OCC_MAGIC   0x52534F434346554CULL  /* "RSOCCFUL" */
 #define RS_OCC_VERSION 1u
 
@@ -78,8 +77,15 @@ typedef struct {
     uint64_t bwt_len_total_with_dollar;
     uint64_t num_blocks;
     int64_t  sentinel_index;
+    uint64_t reserved2;     /* NEW: pads header 56 -> 64 so the cp_occ body
+                               starts 64-byte aligned when mmap'd */
 } rs_occ_full_header_t;
 
+_Static_assert(sizeof(rs_occ_full_header_t) == 64,
+               "header must be 64 bytes to keep the cp_occ body 64B aligned");
+_Static_assert(sizeof(cp_occ32_t) == 128,
+               "cp_occ block must be exactly 2 cache lines");
+               
 /* ── lookup table: byte → symbol index (0-15) or -1 ── */
 static int8_t lut[256];
 

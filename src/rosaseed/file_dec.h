@@ -136,6 +136,8 @@ typedef struct __attribute__((aligned(64))) {
 extern cp_occ32_t *cp_occ;     // [num_blocks]
 extern uint32_t   *mask32;     // [33] prefix masks for 32-bit windows
 
+#define RS_OCC_MAGIC 0x52534F434346554CULL   /* "RSOCCFUL" — must match make_cp_occ_2step.c */
+
 typedef struct {
     uint64_t magic;
     uint32_t version;
@@ -146,7 +148,21 @@ typedef struct {
     uint64_t bwt_len_total_with_dollar;
     uint64_t num_blocks;
     int64_t sentinel_index;
+    uint64_t reserved2;     /* NEW: pads header 56 -> 64 so the cp_occ body
+                               starts 64-byte aligned when mmap'd */
 } rs_occ_full_header_t;
+
+#ifdef __cplusplus
+static_assert(sizeof(rs_occ_full_header_t) == 64,
+              "header must be 64 bytes to keep the cp_occ body 64B aligned");
+static_assert(sizeof(cp_occ32_t) == 128,
+              "cp_occ block must be exactly 2 cache lines");
+#else
+_Static_assert(sizeof(rs_occ_full_header_t) == 64,
+               "header must be 64 bytes to keep the cp_occ body 64B aligned");
+_Static_assert(sizeof(cp_occ32_t) == 128,
+               "cp_occ block must be exactly 2 cache lines");
+#endif
 
 // Fast 32-bit popcount
 #if defined(__clang__) || defined(__GNUC__)
@@ -230,6 +246,5 @@ static inline uint8_t REF_AT(uint64_t pos) {
     return reference_genome[pos];
 }
 #endif
-
 
 #endif // FILE_DECLERATIONS_H

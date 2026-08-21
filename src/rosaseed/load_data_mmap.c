@@ -44,9 +44,8 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #include <time.h>
 
 uint32_t no_of_jumps, _jtable_string_length;
-int64_t sentinel_index = 0;
+int64_t sentinel_index = -1;
 
-// Implement in load_data_mmap.c (it already opens cp_occ header anyway):
 void rosaseed_read_index_metadata(const char *index_dir) {
     char path[4096];
     snprintf(path, sizeof(path), "%s/cp_occ_full.bin", index_dir);
@@ -56,9 +55,42 @@ void rosaseed_read_index_metadata(const char *index_dir) {
 
     rs_occ_full_header_t hdr;
     if (fread(&hdr, sizeof(hdr), 1, f) != 1) {
-        fprintf(stderr, "Failed to read cp_occ header\n"); exit(EXIT_FAILURE);
+        fprintf(stderr, "Failed to read cp_occ header\n");
+        fclose(f); exit(EXIT_FAILURE);
     }
+
+    if (fseeko(f, 0, SEEK_END) != 0) { perror(path); fclose(f); exit(EXIT_FAILURE); }
+    off_t file_size = ftello(f);
     fclose(f);
+    if (file_size < 0) { perror(path); exit(EXIT_FAILURE); }
+
+    /* ---- validation ---- */
+    if (hdr.magic != RS_OCC_MAGIC) {
+        fprintf(stderr, "Error: %s is not a RosaSeed cp_occ file (bad magic).\n", path);
+        exit(EXIT_FAILURE);
+    }
+    if (hdr.occ_interval != OCC_INTERVAL || hdr.alphabet_size != ALPHABET_SIZE) {
+        fprintf(stderr,
+            "Error: index built with occ_interval=%u alphabet=%u, "
+            "this binary expects %d / %d.\n",
+            hdr.occ_interval, hdr.alphabet_size, OCC_INTERVAL, ALPHABET_SIZE);
+        exit(EXIT_FAILURE);
+    }
+    {
+        uint64_t expected_size =
+            (uint64_t)sizeof(hdr) + hdr.num_blocks * (uint64_t)sizeof(cp_occ32_t);
+        if ((uint64_t)file_size != expected_size) {
+            fprintf(stderr,
+                "Error: %s is %llu bytes, expected %llu.\n"
+                "       The index may be truncated, or built by a different\n"
+                "       version of make_cp_occ_2step.  Regenerate with:\n"
+                "         make_cp_occ_2step <bwt> cp_occ_full.bin c_vector.txt\n",
+                path,
+                (unsigned long long)file_size,
+                (unsigned long long)expected_size);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     BWT_SIZE_REFERENCE_SIZE = hdr.bwt_len_total_with_dollar;
     rosaseed_L              = (BWT_SIZE_REFERENCE_SIZE + 1) / 2;
@@ -81,12 +113,16 @@ typedef struct {
 static MmapRegion g_mmap_regions[MAX_MMAP_REGIONS];
 static int        g_n_mmap_regions = 0;
 
+static pthread_mutex_t g_mmap_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static void register_mmap(void *addr, size_t len) {
+    pthread_mutex_lock(&g_mmap_lock);
     if (g_n_mmap_regions < MAX_MMAP_REGIONS) {
         g_mmap_regions[g_n_mmap_regions].addr = addr;
         g_mmap_regions[g_n_mmap_regions].len  = len;
         g_n_mmap_regions++;
     }
+    pthread_mutex_unlock(&g_mmap_lock);
 }
 
 /* Call this instead of free() for mmap'd pointers */
@@ -132,7 +168,12 @@ static void *mmap_file_populate(const char *path,
     }
 
     /* Advise sequential access pattern to the kernel for readahead */
-    madvise(map, map_len, MADV_SEQUENTIAL | MADV_WILLNEED);
+    // madvise(map, map_len, MADV_SEQUENTIAL | MADV_WILLNEED);
+
+    /* MAP_POPULATE has already faulted everything in, so no read-ahead hint is
+    needed.  The runtime pattern is random, and MADV_SEQUENTIAL would let the
+    kernel reclaim these pages eagerly,  exactly wrong for a resident index. */
+    madvise(map, map_len, MADV_RANDOM | MADV_WILLNEED);
 
     register_mmap(map, map_len);
 
@@ -201,9 +242,21 @@ static uint64_t load_occ_full_binary_mmap(const char *path)
     rs_occ_full_header_t hdr;
     if (fread(&hdr, sizeof(hdr), 1, f) != 1) {
         fprintf(stderr, "Error: failed to read OCC full header\n");
+        fclose(f);                                   
         exit(EXIT_FAILURE);
     }
+
+    if (fseeko(f, 0, SEEK_END) != 0) { perror(path); fclose(f); exit(EXIT_FAILURE); }
+    off_t file_size = ftello(f);
     fclose(f);
+    if (file_size < 0) { perror(path); exit(EXIT_FAILURE); }
+
+    /* ---------- magic ---------- */
+    if (hdr.magic != RS_OCC_MAGIC) {
+        fprintf(stderr,
+            "Error: %s is not a RosaSeed cp_occ file (bad magic).\n", path);
+        exit(EXIT_FAILURE);
+    }
 
     if (hdr.occ_interval != OCC_INTERVAL || hdr.alphabet_size != ALPHABET_SIZE) {
         fprintf(stderr, "Error: OCC full binary metadata mismatch\n");
@@ -219,6 +272,24 @@ static uint64_t load_occ_full_binary_mmap(const char *path)
             (unsigned long long)expected_blocks);
         exit(EXIT_FAILURE);
     }
+
+    {
+        uint64_t expected_size =
+            (uint64_t)sizeof(hdr) + hdr.num_blocks * (uint64_t)sizeof(cp_occ32_t);
+
+        if ((uint64_t)file_size != expected_size) {
+            fprintf(stderr,
+                "Error: %s is %llu bytes, expected %llu.\n"
+                "       The index may be truncated, or built by a different\n"
+                "       version of make_cp_occ_2step.  Regenerate with:\n"
+                "         make_cp_occ_2step <bwt> cp_occ_full.bin c_vector.txt\n",
+                path,
+                (unsigned long long)file_size,
+                (unsigned long long)expected_size);
+            exit(EXIT_FAILURE);
+        }
+    }
+    /* ------------------------------------------------------------------ */
 
     size_t body_bytes = hdr.num_blocks * sizeof(cp_occ32_t);
 
@@ -458,4 +529,3 @@ static uint64_t load_occ_full_binary(const char *path)
         (long long)hdr.sentinel_index);
     return hdr.bwt_len_non_dollar;
 }
-
