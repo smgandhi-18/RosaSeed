@@ -60,7 +60,7 @@ RosaSeed/
 | GCC / g++ ≥ 7 | C++14 support required |
 | GNU Make | Standard build |
 | x86-64 with AVX2 | Required for `arch=native` |
-| RAM ≥ 64 GB | ~50 GB peak at alignment time |
+| RAM ≥ 64 GB | ~50 GB peak at alignment time — see [Genome size limits](#genome-size-limits) |
 
 **Index builder additional requirements:**
 
@@ -165,6 +165,35 @@ RosaSeed requires two separate indexes:
 | RosaSeed index | `index-builder/build_2step_pipeline.sh` | `index-builder/index/<name>/` | ~42.7 GB |
 
 **Combined peak memory at alignment time: ~49.61 GB**
+
+---
+
+## Genome size limits
+
+The RosaSeed index format stores BWT positions in 33-bit fields, giving a hard
+limit of **4,294,967,296 bp (2³², ≈4.29 Gbp)** for the reference genome.
+
+| Genome | Size | Field used | Supported |
+|---|---|---|---|
+| Human T2T-CHM13v2 | 3.12 Gbp | 72.6% | ✅ |
+| Human GRCh38 | 3.10 Gbp | 72.2% | ✅ |
+| Mouse GRCm39 | 2.70 Gbp | 62.9% | ✅ |
+| Maize B73 | 2.30 Gbp | 53.6% | ✅ |
+| Wheat IWGSC | 17.0 Gbp | — | ❌ |
+| Axolotl | 32.0 Gbp | — | ❌ |
+
+Two further limits are enforced at index-build time:
+
+- **Per-symbol occurrence count** must fit in 32 bits. This is composition
+  dependent — roughly 22 Gbp for a human-like base distribution, so it is not
+  the binding constraint in practice.
+- **No k-mer may occur more than 536,870,911 times.** The jump-table builder
+  reports the observed maximum for each table, so the headroom is visible on
+  every run.
+
+All limits are checked explicitly. The pipeline exits with an error naming the
+offending value rather than producing incorrect coordinates, and the aligner
+re-checks at startup so an index built elsewhere cannot be used silently.
 
 ---
 
