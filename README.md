@@ -185,7 +185,7 @@ limit of **4,294,967,296 bp (2³², ≈4.29 Gbp)** for the reference genome.
 Two further limits are enforced at index-build time:
 
 - **Per-symbol occurrence count** must fit in 32 bits. This is composition
-  dependent — roughly 22 Gbp for a human-like base distribution, so it is not
+  dependent and roughly 22 Gbp for a human-like base distribution, so it is not
   the binding constraint in practice.
 - **No k-mer may occur more than 536,870,911 times.** The jump-table builder
   reports the observed maximum for each table, so the headroom is visible on
