@@ -237,6 +237,21 @@ int main(int argc, char *argv[])
     }
 
     double elapsed = (double)(clock()-t0)/CLOCKS_PER_SEC;
+    const char *sym_names[16] = {
+        "0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F"
+    };
+    
+    for (int s = 0; s < ALPHABET_SIZE; s++) {
+        if (running[s] > 0xFFFFFFFFULL) {
+            fprintf(stderr,
+                "\n[FATAL] symbol '%s' occurs %llu times, exceeding the 32-bit\n"
+                "        cp_count field (max %u).  This reference cannot be\n"
+                "        represented by the current cp_occ format.\n"
+                "        See README, 'Genome size limits'.\n",
+                sym_names[s], (unsigned long long)running[s], 0xFFFFFFFFu);
+            return EXIT_FAILURE;
+        }
+    }
 
     /* ── C vector ────────────────────────────────────────────────────────
      *
@@ -310,9 +325,7 @@ int main(int argc, char *argv[])
 
     /* symbol counts */
     fprintf(stderr, "\n  Base-16 symbol counts:\n");
-    const char *sym_names[16] = {
-        "0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F"
-    };
+
     for (int k = 0; k < ALPHABET_SIZE; k++)
         fprintf(stderr, "    %s = %llu\n", sym_names[k],
                 (unsigned long long)running[k]);

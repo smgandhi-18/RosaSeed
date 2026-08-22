@@ -3,7 +3,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define MAX_REF_LEN 7000000000ULL   // up to 7 billion bases if needed
+#define MAX_REF_LEN      7000000000ULL    /* allocation cap */
+#define RS_MAX_GENOME_BP 4294967296ULL    /* 2^32 — real format limit */
 #define WRITE_BUF_SIZE (1 << 20)    // 1 MB write buffer
 #define LINE_LEN 80                 // FASTA line width
 
@@ -181,6 +182,16 @@ int main(int argc, char *argv[]) {
     char *ref = read_fasta(argv[1]);
     size_t ref_len = strlen(ref);
     printf("Reference length: %zu bases\n", ref_len);
+    
+    if (ref_len > RS_MAX_GENOME_BP) {
+        fprintf(stderr,
+            "\n[FATAL] Reference is %zu bp, exceeding the RosaSeed index format\n"
+            "        limit of %llu bp (~4.29 Gbp).  BWT positions are stored in\n"
+            "        33-bit fields; a larger reference would be silently truncated.\n"
+            "        See README, 'Genome size limits'.\n",
+            ref_len, (unsigned long long)RS_MAX_GENOME_BP);
+        exit(EXIT_FAILURE);
+    }
 
     // Step 2: Allocate memory
     size_t half_len_base16 = ref_len / 2 + 2;

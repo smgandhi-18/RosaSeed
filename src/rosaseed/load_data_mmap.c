@@ -91,6 +91,15 @@ void rosaseed_read_index_metadata(const char *index_dir) {
             exit(EXIT_FAILURE);
         }
     }
+    
+    if (hdr.bwt_len_total_with_dollar > RS_MAX_BWT_LEN) {
+        fprintf(stderr,
+            "\n[FATAL] BWT length %llu exceeds the 2^33 limit of the current index\n"
+            "        format (reference genomes up to ~4.29 Gbp).\n"
+            "        See README, 'Genome size limits'.\n",
+            (unsigned long long)hdr.bwt_len_total_with_dollar);
+        exit(EXIT_FAILURE);
+    }    
 
     BWT_SIZE_REFERENCE_SIZE = hdr.bwt_len_total_with_dollar;
     rosaseed_L              = (BWT_SIZE_REFERENCE_SIZE + 1) / 2;

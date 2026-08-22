@@ -168,12 +168,65 @@ static inline uint64_t get_sa(uint64_t row)
     return ((uint64_t)sa_ms[row] << 32) | (uint64_t)sa_ls[row];
 }
 
-/* ── jump pointer encoding ── */
+/* ── jump-pointer field widths ───────────────────────────────────────────
+ * Packed layout, must match extract_jump_bounds() in helper_functions.c:
+ *   bit  63     : unique flag
+ *   bits 62..34 : diff  (29 bits)
+ *   bit  33     : unused (reserved)
+ *   bits 32..0  : lo, or SA position when unique (33 bits)
+ */
+#define JT_LO_BITS    33
+#define JT_DIFF_BITS  29
+#define JT_LO_MAX     ((1ULL << JT_LO_BITS)   - 1ULL)   /* 8,589,934,591 */
+#define JT_DIFF_MAX   ((1ULL << JT_DIFF_BITS) - 1ULL)   /*   536,870,911 */
+
+static uint64_t g_max_diff_seen = 0;
+static uint64_t g_max_lo_seen   = 0;
+
 static inline uint64_t encode_jp(uint64_t lo, uint64_t hi)
 {
     uint64_t diff = hi - lo;
+
     if (diff == 0) return 0ULL;
-    if (diff == 1) return (1ULL << 63) | (get_sa(lo) & 0x1FFFFFFFFULL);
+
+    if (diff > g_max_diff_seen) g_max_diff_seen = diff;
+    if (lo   > g_max_lo_seen)   g_max_lo_seen   = lo;
+
+    if (diff == 1) {
+        uint64_t sa = get_sa(lo);
+        if (sa > JT_LO_MAX) {
+            fprintf(stderr,
+                "\n[FATAL] SA value %llu exceeds the %d-bit field (max %llu).\n"
+                "        BWT length is >= 2^%d; this reference is too large.\n"
+                "        See README, 'Genome size limits'.\n",
+                (unsigned long long)sa, JT_LO_BITS,
+                (unsigned long long)JT_LO_MAX, JT_LO_BITS);
+            exit(EXIT_FAILURE);
+        }
+        return (1ULL << 63) | (sa & 0x1FFFFFFFFULL);
+    }
+
+    if (diff > JT_DIFF_MAX) {
+        fprintf(stderr,
+            "\n[FATAL] interval width %llu exceeds the %d-bit diff field (max %llu).\n"
+            "        Encoding it would set bit 63, and the aligner would decode\n"
+            "        this entry as a UNIQUE seed at a bogus position.\n"
+            "        Use a longer k-mer (-j 15 / -j 16) or widen the diff field.\n",
+            (unsigned long long)diff, JT_DIFF_BITS,
+            (unsigned long long)JT_DIFF_MAX);
+        exit(EXIT_FAILURE);
+    }
+
+    if (lo > JT_LO_MAX) {
+        fprintf(stderr,
+            "\n[FATAL] interval start %llu exceeds the %d-bit lo field (max %llu).\n"
+            "        BWT length is >= 2^%d; this reference is too large.\n"
+            "        See README, 'Genome size limits'.\n",
+            (unsigned long long)lo, JT_LO_BITS,
+            (unsigned long long)JT_LO_MAX, JT_LO_BITS);
+        exit(EXIT_FAILURE);
+    }
+
     return lo | (diff << 34);
 }
 
@@ -204,6 +257,8 @@ static inline uint64_t encode_jp(uint64_t lo, uint64_t hi)
 static void make_table_14(const char *out_path)
 {
     const uint64_t total = 268435456ULL;   /* 16^7 */
+    g_max_diff_seen = 0;
+    g_max_lo_seen   = 0;
 
     FILE *fout = fopen(out_path, "wb");
     if (!fout) { perror(out_path); exit(EXIT_FAILURE); }
@@ -263,6 +318,14 @@ static void make_table_14(const char *out_path)
             (unsigned long long)cnt_multi,  100.0*cnt_multi/(double)total);
     fprintf(stderr, "  none     : %llu  (%.2f%%)\n",
             (unsigned long long)cnt_none,   100.0*cnt_none/(double)total);
+    fprintf(stderr, "  max diff : %llu  (%.2f%% of %llu limit)\n",
+            (unsigned long long)g_max_diff_seen,
+            100.0 * (double)g_max_diff_seen / (double)JT_DIFF_MAX,
+            (unsigned long long)JT_DIFF_MAX);
+    fprintf(stderr, "  max lo   : %llu  (%.2f%% of %llu limit)\n",
+            (unsigned long long)g_max_lo_seen,
+            100.0 * (double)g_max_lo_seen / (double)JT_LO_MAX,
+            (unsigned long long)JT_LO_MAX);        
     fprintf(stderr, "  output   : %s  (%.2f GiB)\n",
             out_path, (double)(written*8)/1073741824.0);
 }
@@ -308,6 +371,8 @@ static void make_table_14(const char *out_path)
 static void make_table_15(const char *out_path)
 {
     const uint64_t total = 1073741824ULL;   /* 4^15 */
+    g_max_diff_seen = 0;
+    g_max_lo_seen   = 0;
 
     FILE *fout = fopen(out_path, "wb");
     if (!fout) { perror(out_path); exit(EXIT_FAILURE); }
@@ -374,6 +439,14 @@ static void make_table_15(const char *out_path)
             (unsigned long long)cnt_multi,  100.0*cnt_multi/(double)total);
     fprintf(stderr, "  none     : %llu  (%.2f%%)\n",
             (unsigned long long)cnt_none,   100.0*cnt_none/(double)total);
+    fprintf(stderr, "  max diff : %llu  (%.2f%% of %llu limit)\n",
+            (unsigned long long)g_max_diff_seen,
+            100.0 * (double)g_max_diff_seen / (double)JT_DIFF_MAX,
+            (unsigned long long)JT_DIFF_MAX);
+    fprintf(stderr, "  max lo   : %llu  (%.2f%% of %llu limit)\n",
+            (unsigned long long)g_max_lo_seen,
+            100.0 * (double)g_max_lo_seen / (double)JT_LO_MAX,
+            (unsigned long long)JT_LO_MAX);        
     fprintf(stderr, "  output   : %s  (%.2f GiB)\n",
             out_path, (double)(written*8)/1073741824.0);
 }
@@ -399,6 +472,8 @@ static void make_table_15(const char *out_path)
 static void make_table_16(const char *out_path)
 {
     const uint64_t total = 4294967296ULL;   /* 4^16 */
+    g_max_diff_seen = 0;
+    g_max_lo_seen   = 0;
 
     FILE *fout = fopen(out_path, "wb");
     if (!fout) { perror(out_path); exit(EXIT_FAILURE); }
@@ -455,6 +530,14 @@ static void make_table_16(const char *out_path)
             (unsigned long long)cnt_multi,  100.0*cnt_multi/(double)total);
     fprintf(stderr, "  none     : %llu  (%.2f%%)\n",
             (unsigned long long)cnt_none,   100.0*cnt_none/(double)total);
+    fprintf(stderr, "  max diff : %llu  (%.2f%% of %llu limit)\n",
+            (unsigned long long)g_max_diff_seen,
+            100.0 * (double)g_max_diff_seen / (double)JT_DIFF_MAX,
+            (unsigned long long)JT_DIFF_MAX);
+    fprintf(stderr, "  max lo   : %llu  (%.2f%% of %llu limit)\n",
+            (unsigned long long)g_max_lo_seen,
+            100.0 * (double)g_max_lo_seen / (double)JT_LO_MAX,
+            (unsigned long long)JT_LO_MAX);
     fprintf(stderr, "  output   : %s  (%.2f GiB)\n",
             out_path, (double)(written*8)/1073741824.0);
 }

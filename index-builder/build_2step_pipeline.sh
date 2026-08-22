@@ -250,6 +250,16 @@ ACGT_COUNT=$(tr -cd 'ACGT' < "$CLEAN_FILE" | wc -c)
 [[ $ACGT_COUNT -eq $GENOME_LEN ]] || die "Non-ACGT chars found in clean file"
 ok "Genome length : $GENOME_LEN bp"
 
+RS_MAX_GENOME_BP=4294967296          # 2^32 — see file_dec.h
+if [[ $GENOME_LEN -gt $RS_MAX_GENOME_BP ]]; then
+    die "Genome is $GENOME_LEN bp, exceeding the RosaSeed index format limit of \
+$RS_MAX_GENOME_BP bp (~4.29 Gbp).
+       BWT positions are stored in 33-bit fields; a larger reference would be
+       silently truncated and produce incorrect alignment coordinates.
+       See README, 'Genome size limits'."
+fi
+ok "Genome size    : within the ${RS_MAX_GENOME_BP} bp format limit ($(( 100 * GENOME_LEN / RS_MAX_GENOME_BP ))% used)"
+
 # =============================================================================
 step "[ 5/15 ] Building 2-step base-16 reference (FE+FO+RCE+RCO)"
 # =============================================================================
