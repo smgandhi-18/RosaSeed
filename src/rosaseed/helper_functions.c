@@ -40,6 +40,14 @@ uint64_t increment_sa_compute = 0;
 
 #define TWO_STEP_TOTAL_LEN (2ULL * rosaseed_L)
 
+/* SA / BWT row space: [0, N).  SA values wrap modulo N.
+   NOTE: this is NOT 2*rosaseed_L — for 2-step, 2L == N+1, and for
+   1-step, 2L == N-1. */
+#define BWT_ROW_SPACE    (BWT_SIZE_REFERENCE_SIZE)
+
+/* BWA global coordinate space: [0, 2L), forward then reverse-complement. */
+#define BWA_COORD_SPACE  (2ULL * rosaseed_L)
+
 static int rosaseed_compare_smem(const void *a, const void *b)
 {
     const SMEM *pa = (const SMEM *)a;
@@ -111,8 +119,7 @@ uint64_t get_sa_entry_compressed_RS(uint64_t pos)
 
     uint64_t val = base + steps;
 
-    if (val >= TWO_STEP_TOTAL_LEN)
-        val -= TWO_STEP_TOTAL_LEN;
+    if (val >= BWT_ROW_SPACE) val -= BWT_ROW_SPACE;      /* was TWO_STEP_TOTAL_LEN */
 
     return val;
 }

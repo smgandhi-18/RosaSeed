@@ -131,8 +131,15 @@ typedef struct {
     uint64_t bwt_len_total_with_dollar;
     uint64_t num_blocks;
     int64_t  sentinel_index;
+    uint64_t reserved2;     /* pads header 56 -> 64; MUST match file_dec.h
+                               and make_cp_occ_2step.c */
 } rs_occ_full_header_t;
 
+_Static_assert(sizeof(rs_occ_full_header_t) == 64,
+               "header must be 64 bytes — keep in sync with file_dec.h");
+_Static_assert(sizeof(cp_occ32_t) == 128,
+               "cp_occ block must be exactly 2 cache lines");
+               
 /* ── global data ── */
 static cp_occ32_t *blocks = NULL;
 static uint64_t    C[ALPHABET_SIZE + 1];   /* C[0..15] from file, C[16]=N */
