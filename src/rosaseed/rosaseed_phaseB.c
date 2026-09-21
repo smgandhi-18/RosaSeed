@@ -2,7 +2,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -59,7 +59,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
    /* Universal 2-base FM backward step for base-4 read.
       - pat4 is read in base-4 (array of 0..3)
       - read_idx_base is the index of the RIGHT base (i)
-      - We read pat4[i] (right) and pat4[i-1] (left)
+      - So, this is read pat4[i] (right) and pat4[i-1] (left)
       - Compose 4-bit base16 symbol: (left<<2) | right
    */
    static inline __attribute__((always_inline))
@@ -77,7 +77,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
        uint8_t right = pat4[i];
        uint8_t left  = pat4[i - 1];
    
-       base16_t sym = (base16_t)((left << 2) | right);   // LS2 bits are RIGHT base
+       base16_t sym = (base16_t)((left << 2) | right);   
    
        uint64_t L2 = *l;
        uint64_t H2 = *h;
@@ -268,7 +268,7 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
     return matched;
 }
    
-   /* Decide next pivot in *base* coordinates.
+   /* Decide next pivot in "base" coordinates.
       - seed_end_base: base index of rightmost base of seed
       - seed_len_bases: total bases consumed for this seed
       - emitted: 1 if we actually emitted a seed; 0 otherwise
@@ -296,9 +296,6 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
    }
    
    /* Try extending a leftover single base at the left edge.
-      pat4[0] is the RIGHT base.
-      Test all 4 possible LEFT bases.
-      If any succeeds, seed_len_bases += 1 (not 2).
    */
    static inline __attribute__((always_inline))
    int fm_left_edge_rescue_b4(const uint8_t *pat4,
@@ -473,7 +470,7 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
                 }
                 sl->unique_at_jump = 0;
                 sl->phase = 1;
-                /* prefetch already fired in PASS 2 — yield to next pivot */
+                /* prefetch already fired in PASS 2: yield to next pivot */
                 continue;
             }
 
@@ -512,7 +509,7 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
                 sl->seed_len_bases += 2;
                 sl->diff = sl->h - sl->l;
 
-                /* specificity threshold — same as original while(1) */
+                /* specificity threshold: same as original while(1) */
                 if (sl->diff < (uint64_t)min_intv && sl->seed_len_bases >= min_seed_bc) {
                     if (sl->diff == 1 && sl->ref_after == 0) {
                         sl->ref_after = reconstruct_ref_base_index(sl->l);
@@ -555,16 +552,16 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
                     continue;
                 }
 
-                /* more FM steps — prefetch next cp_occ before yielding */
+                /* more FM steps: prefetch next cp_occ before yielding */
                 __builtin_prefetch((const char *)&cp_occ[sl->l >> 5],      0, 1);
                 __builtin_prefetch((const char *)&cp_occ[sl->l >> 5] + 64, 0, 1);
                 __builtin_prefetch((const char *)&cp_occ[sl->h >> 5],      0, 1);
                 __builtin_prefetch((const char *)&cp_occ[sl->h >> 5] + 64, 0, 1);
-                /* stay in phase 1 — continue round-robin */
+                /* stay in phase 1: continue round-robin */
                 continue;
             }
 
-            /* phase 2 should never be active — deactivated above */
+            /* phase 2 should never be active: deactivated above */
             sl->active = 0; n_active--;
         }
     }
@@ -657,4 +654,4 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
         }
         (void)pivot_base; 
     } /* for pivots PASS 4 */
-} /* phaseII_routine */
+} 

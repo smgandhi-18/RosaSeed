@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -41,7 +41,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
  * Runtime-configurable equivalents (set from argv; g_min_seed_len_BC is always
  * g_min_seed_len_A + 1 — one user-facing parameter, the other is derived).
  * Runtime-configurable Phase B/C specificity threshold and Phase A interval cap.
- * Both set from argv; compile-time values above are kept as documentation defaults.
+ * Both set from argv
  ********************************************************************************/
 
 extern int     g_min_seed_len_A;    // Phase A  minimum seed length  (default 19)
@@ -84,9 +84,6 @@ extern uint64_t rosaseed_L;   // = (BWT_SIZE_REFERENCE_SIZE + 1) / 2
 #define NOT_FOUND 0
 #define FOUND 1
 
-// ==============================
-//  STRUCT DEFINITIONS
-// ==============================
 typedef struct smem_struct
 {
     uint64_t low_ptr_read;
@@ -102,9 +99,6 @@ typedef struct smem_struct
     uint8_t  unique_leftmost_base_off;   // 0 = left base of symbol, 1 = right base
 } SMEM;
 
-// ==============================
-//  FEATURE FLAGS
-// ==============================
 #define MAX_PROF_ENTRIES 256
 #define MAX_PATTERN_SIZE 250
 

@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -134,7 +134,7 @@ static void register_mmap(void *addr, size_t len) {
     pthread_mutex_unlock(&g_mmap_lock);
 }
 
-/* Call this instead of free() for mmap'd pointers */
+/* this instead of free() for mmap'd pointers */
 void unmap_all_index_regions(void) {
     for (int i = 0; i < g_n_mmap_regions; ++i) {
         if (g_mmap_regions[i].addr && g_mmap_regions[i].addr != MAP_FAILED)
@@ -176,12 +176,6 @@ static void *mmap_file_populate(const char *path,
         exit(EXIT_FAILURE);
     }
 
-    /* Advise sequential access pattern to the kernel for readahead */
-    // madvise(map, map_len, MADV_SEQUENTIAL | MADV_WILLNEED);
-
-    /* MAP_POPULATE has already faulted everything in, so no read-ahead hint is
-    needed.  The runtime pattern is random, and MADV_SEQUENTIAL would let the
-    kernel reclaim these pages eagerly,  exactly wrong for a resident index. */
     madvise(map, map_len, MADV_RANDOM | MADV_WILLNEED);
 
     register_mmap(map, map_len);
@@ -260,7 +254,6 @@ static uint64_t load_occ_full_binary_mmap(const char *path)
     fclose(f);
     if (file_size < 0) { perror(path); exit(EXIT_FAILURE); }
 
-    /* ---------- magic ---------- */
     if (hdr.magic != RS_OCC_MAGIC) {
         fprintf(stderr,
             "Error: %s is not a RosaSeed cp_occ file (bad magic).\n", path);
@@ -298,12 +291,11 @@ static uint64_t load_occ_full_binary_mmap(const char *path)
             exit(EXIT_FAILURE);
         }
     }
-    /* ------------------------------------------------------------------ */
 
     size_t body_bytes = hdr.num_blocks * sizeof(cp_occ32_t);
 
     void *mapped = mmap_file_populate(path,
-                                      sizeof(hdr),   /* skip header */
+                                      sizeof(hdr),   
                                       body_bytes,
                                       "cp_occ (mmap+MAP_POPULATE)",
                                       NULL);

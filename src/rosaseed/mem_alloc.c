@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -44,7 +44,7 @@ FILE *read_output_fp = NULL;
 FILE *jump_masks_fp = NULL;
 
 uint32_t *sa_ls_word = NULL;
-uint8_t  *sa_ms_byte = NULL;   // was sa_msb_bit
+uint8_t  *sa_ms_byte = NULL;   
 uint64_t *c_vec = NULL;
 uint64_t *dummy = NULL;
 uint64_t **occ_mat = NULL;
@@ -93,7 +93,7 @@ void allocate_memory() {
     }
 
     #if PACK_REF16
-    size_t packed_bytes = (BWT_SIZE_REFERENCE_SIZE + 1) >> 1;  // ceil(N/2)
+    size_t packed_bytes = (BWT_SIZE_REFERENCE_SIZE + 1) >> 1;  
     if (posix_memalign((void**)&ref16_packed, 64, packed_bytes) != 0) {
         fprintf(stderr, "Memory alignment failed for ref16_packed\n");
         exit(EXIT_FAILURE);
@@ -110,7 +110,7 @@ void allocate_memory() {
         exit(EXIT_FAILURE);
     }
 
-    const uint64_t num_blocks = (BWT_SIZE_REFERENCE_SIZE + OCC_INTERVAL) / OCC_INTERVAL; // ceil((N)/32)
+    const uint64_t num_blocks = (BWT_SIZE_REFERENCE_SIZE + OCC_INTERVAL) / OCC_INTERVAL; 
     cp_occ = (cp_occ32_t*)_mm_malloc(num_blocks * sizeof(cp_occ32_t), 64);
     if (!cp_occ) { perror("cp_occ alloc"); exit(1); }
 
@@ -176,7 +176,7 @@ void print_fm_memory_report(void){
     /* reference storage (packed vs unpacked) */
 #if PACK_REF16
     {
-        uint64_t packed_bytes = (N + 1) >> 1;  /* ceil(N/2) bytes */
+        uint64_t packed_bytes = (N + 1) >> 1;  
         fprintf(stderr, "ref16_packed: ceil(%llu/2) = %llu bytes = %.2f MiB\n",
                 (unsigned long long)N,
                 (unsigned long long)packed_bytes,

@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -79,7 +79,7 @@ int fm_step2_b4(const uint8_t *pat4,
     uint8_t right = pat4[i];
     uint8_t left  = pat4[i - 1];
 
-    base16_t sym = (base16_t)((left << 2) | right);   // LS2 bits are RIGHT base
+    base16_t sym = (base16_t)((left << 2) | right);  
 
     uint64_t L2 = *l;
     uint64_t H2 = *h;
@@ -600,19 +600,10 @@ void phaseI_routine(
 
 /* =======================================================================
    COROUTINE BATCH PHASE I
-   =======================================================================
-
-   Design principle: hide BWT RAM latency by interleaving FM steps across
-   RS_BATCH reads.  After every single fm_step2_b4() call we know the new
-   l and h: we immediately prefetch cp_occ[l>>5] and cp_occ[h>>5] for
-   THAT read, then move to the next read's step.  
    ======================================================================= */
 
 #include "phaseA_dec.h"
 
-/* -----------------------------------------------------------------------
-   Per-pivot working state for one read in the coroutine interleaver.
-   ----------------------------------------------------------------------- */
 typedef struct {
     const uint8_t *pat;           /* chosen-strand base-4 read pointer    */
     int            read_len;
@@ -816,9 +807,6 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
     const int read_len_bases = st->read_len_bases;
     const uint8_t *pat    = st->pat;
 
-    /* ================================================================
-       PHASE 0: do jump for current pivot, classify unique vs non-unique
-       ================================================================ */
     if (st->phase == 0) {
 
         int pivot_base = st->pivot_base;
@@ -854,9 +842,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
 #ifdef ENABLE_COUNTERS
             counter_readunique_after1stjump++;
 #endif
-            /* ref_walk is cheap (sequential ref memory, well-prefetched
-               by hardware), so we do it in full here rather than splitting
-               it across scheduling rounds.                               */
+
             uint64_t ref_pos = st->l - 1;
             st->ref_after    = ref_pos;
             st->leftmost_sym_tmp = ref_pos + 1;
@@ -965,8 +951,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
         st->diff = st->h - st->l;
 
         if (st->diff == 1) {
-            /* became unique mid-extension: do ref_walk immediately
-               (same logic as original, sequential memory access) */
+            /* became unique mid-extension: do ref_walk */
             uint64_t ref_pos = reconstruct_ref_base_index(st->l);
             int mismatch_base = -1, new_read_idx = st->read_idx_base;
             uint64_t ref_after_tmp = ref_pos;
@@ -1101,8 +1086,7 @@ void phaseI_batch_interleaved(
         }
     }
 
-    /* write chosen_strand back from slots (init already did it but
-       phaseI_slot_step never changes it, so this is a no-op safety copy) */
+    /* write chosen_strand back from slots */
     for (int s = 0; s < nreads; ++s)
         chosen_strands[s] = slots[s].chosen_strand;
 }

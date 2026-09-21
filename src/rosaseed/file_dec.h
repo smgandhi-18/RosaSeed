@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -70,7 +70,6 @@ extern uint64_t BWT_SIZE_REFERENCE_SIZE;   // set at startup from cp_occ header
     #define JUMP_TABLE_ENTRIES 4294967296ULL 
 #endif
 
-// Real builds must pass -DLOAD_JTABLE_Xnt — runtime check catches missing flag.
 #ifndef JUMP_TABLE_ENTRIES
     #define JUMP_TABLE_ENTRIES 268435456ULL 
 #endif
@@ -151,8 +150,7 @@ typedef struct {
     uint64_t bwt_len_total_with_dollar;
     uint64_t num_blocks;
     int64_t sentinel_index;
-    uint64_t reserved2;     /* NEW: pads header 56 -> 64 so the cp_occ body
-                               starts 64-byte aligned when mmap'd */
+    uint64_t reserved2;     
 } rs_occ_full_header_t;
 
 #ifdef __cplusplus

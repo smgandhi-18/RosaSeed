@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -238,10 +238,6 @@ uint64_t unique_seed_to_bwa_rbeg_fast(
 
     return finalize_rbeg_from_raw_fast(twoL, slen, is_rc, raw);
 }
-
-/* --------------------------------------------------------------------------
-   Materialization
-   -------------------------------------------------------------------------- */
 
 uint32_t materialize_seed_rbegs_base4(
     const TwoStepMapInfo *info,

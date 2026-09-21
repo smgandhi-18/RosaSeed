@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -44,18 +44,6 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #  define RS_BATCH 32
 #endif
 
-/*
- * Everything phaseI_routine uses as "local" state for one read.
- * The probe function fills chosen_strand / l0 / h0 / d0 and sets
- * done=0.  The bridge then calls phaseI_routine normally, the
- * probe result is NOT passed back in; phaseI_routine recomputes
- * the first jump internally (it is O(1) table lookup so the cost
- * is negligible compared to the FM extension that follows).
- *
- * The reason we keep the full f4/rc4 arrays here is so the bridge
- * can prefetch cp_occ blocks for MULTIPLE reads before processing
- * any of them, hiding cross-read RAM latency.
- */
 typedef struct {
     /* base-4 encoded read arrays, filled before the probe */
     uint8_t  f4 [RS_BATCH_MAX_READ_LEN];
@@ -77,19 +65,6 @@ typedef struct {
 extern "C" {
 #endif
 
-/*
- * phaseI_probe_first_pivot()
- *
- * Does ONLY the strand-choice probe + first jump-table lookup for one read.
- * Writes chosen_strand, l0, h0, d0 into *slot.
- * Issues __builtin_prefetch for the cp_occ blocks those BWT positions
- * live in, so the hardware can start fetching them from RAM while the
- * caller goes on to probe other reads.
- *
- * This function does NOT touch matchArray or numberofSMEMs.
- * It does NOT perform any FM backward extension.
- * phaseI_routine() must still be called afterwards for the full extension.
- */
 void phaseI_probe_first_pivot(PhaseI_SlotState *slot);
 
 void phaseI_batch_interleaved(
