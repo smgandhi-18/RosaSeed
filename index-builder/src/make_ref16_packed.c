@@ -1,9 +1,37 @@
+/*************************************************************************************
+                           The MIT License
+
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+   Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+
+*****************************************************************************************/
 /*
  * make_ref16_packed.c
  *
  * Packs a base-16 ASCII reference file into a binary nibble-packed file.
  * Replaces the slow fgetc-based version with fread (64 MB chunks).
- * Two-pass approach preserved (count then pack) but using fread.
  *
  * Input:  ASCII base-16 reference (.txt, single-line or multi-line)
  *         Valid chars: 0-9, A-F, a-f (case-insensitive)
@@ -47,7 +75,6 @@ static void init_lut(void) {
         lut['A'+i] = (uint8_t)(10+i);
         lut['a'+i] = (uint8_t)(10+i);
     }
-    /* whitespace and $ → 255 (skip) — already set */
 }
 
 static inline void ref16_set(uint8_t *buf, uint64_t i, uint8_t v) {
@@ -97,7 +124,7 @@ int main(int argc, char **argv)
             (unsigned long long)n_symbols, t1);
 
     /* ── allocate packed buffer ── */
-    uint64_t n_bytes = (n_symbols + 1) >> 1;   /* ceil(n/2) */
+    uint64_t n_bytes = (n_symbols + 1) >> 1;   
     fprintf(stderr, "  packed bytes  : %llu  (%.2f GB)\n",
             (unsigned long long)n_bytes, (double)n_bytes / 1e9);
 
@@ -122,7 +149,6 @@ int main(int argc, char **argv)
             uint8_t v = lut[rbuf[i]];
             if (v != 255) ref16_set(packed, idx++, v);
         }
-        /* progress */
         if (idx % 500000000ULL < (uint64_t)nread) {
             double el = (double)(clock()-t2)/CLOCKS_PER_SEC;
             fprintf(stderr, "\r  %llu / %llu symbols  (%.0fs)",
@@ -143,15 +169,12 @@ int main(int argc, char **argv)
         free(packed); return 1;
     }
 
-    /* ── write output ── */
     FILE *out = fopen(argv[2], "wb");
     if (!out) { perror(argv[2]); free(packed); return 1; }
 
-    /* 8-byte header: symbol count */
     if (fwrite(&n_symbols, sizeof(uint64_t), 1, out) != 1) {
         fprintf(stderr,"Write header failed\n"); free(packed); fclose(out); return 1;
     }
-    /* packed data */
     if (fwrite(packed, 1, (size_t)n_bytes, out) != (size_t)n_bytes) {
         fprintf(stderr,"Write data failed\n"); free(packed); fclose(out); return 1;
     }
@@ -167,7 +190,6 @@ int main(int argc, char **argv)
             (unsigned long long)(sizeof(uint64_t) + n_bytes));
     fprintf(stderr, "  output file   : %s\n", argv[2]);
 
-    /* sanity */
     fprintf(stderr, "\n  Sanity checks:\n");
     fprintf(stderr, "  %s  n_symbols = %llu  (expected 6234551000 for T2T 2-step)\n",
             n_symbols == 6234551000ULL ? "[OK]  " : "[NOTE]",

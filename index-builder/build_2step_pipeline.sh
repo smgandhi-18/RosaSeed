@@ -1,5 +1,33 @@
 #!/usr/bin/env bash
 # =============================================================================
+#                            The MIT License
+#
+#    RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+#    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+#
+#    Permission is hereby granted, free of charge, to any person obtaining
+#    a copy of this software and associated documentation files (the
+#    "Software"), to deal in the Software without restriction, including
+#    without limitation the rights to use, copy, modify, merge, publish,
+#    distribute, sublicense, and/or sell copies of the Software, and to
+#    permit persons to whom the Software is furnished to do so, subject to
+#    the following conditions:
+#
+#    The above copyright notice and this permission notice shall be
+#    included in all copies or substantial portions of the Software.
+#
+#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+#    BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+#    ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+#    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#    SOFTWARE.
+#
+#    Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+# =============================================================================
+#
 # build_2step_pipeline.sh
 #
 # Complete FM-index build pipeline for the 2-step RosaSeed aligner.
@@ -33,7 +61,7 @@
 #                15      15-mer only  ( 8 GiB, ~25 min)
 #                16      16-mer only  (32 GiB, ~20 min)
 #                all     14 + 15 + 16
-#                14,15   default — recommended for most read lengths
+#                14,15   default: recommended for most read lengths
 #   -h         Help
 #
 # Examples:
@@ -156,7 +184,6 @@ read_peak() {
 # Clean up monitor on exit
 trap 'stop_monitor; rm -f "$LABEL_FILE"' EXIT
 
-# ── banner ────────────────────────────────────────────────────────────────────
 hr
 echo -e "${BOLD}  2-step RosaSeed FM-index build pipeline${RESET}"
 hr

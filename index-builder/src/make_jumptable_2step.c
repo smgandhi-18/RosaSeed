@@ -1,3 +1,33 @@
+/*************************************************************************************
+                           The MIT License
+
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+   Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+
+*****************************************************************************************/
+
 /*
  * make_jumptable_2step.c
  *
@@ -72,9 +102,9 @@
  * ── Jump pointer encoding (identical to 1-step) ───────────────────────────
  *
  *   diff = hi - lo
- *   diff==0 → jp = 0                                  (no mapping)
+ *   diff==0 → jp = 0                                   (no mapping)
  *   diff==1 → jp = (1ULL<<63) | (SA[lo] & 0x1FFFFFFFF) (unique)
- *   diff>1  → jp = lo | (diff << 34)                 (non-unique)
+ *   diff>1  → jp = lo | (diff << 34)                   (non-unique)
  *
  * ── Memory requirements ───────────────────────────────────────────────────
  *
@@ -114,7 +144,7 @@
 #define OCC_INTERVAL   32
 
 /* ── cp_occ structures (must match make_cp_occ_2step.c) ── */
-#define RS_OCC_MAGIC   0x52534F434346554CULL   /* "RSOCCFUL" */
+#define RS_OCC_MAGIC   0x52534F434346554CULL   
 
 typedef struct {
     uint32_t cp_count[16];   /* 64 bytes */
@@ -140,7 +170,6 @@ _Static_assert(sizeof(rs_occ_full_header_t) == 64,
 _Static_assert(sizeof(cp_occ32_t) == 128,
                "cp_occ block must be exactly 2 cache lines");
                
-/* ── global data ── */
 static cp_occ32_t *blocks = NULL;
 static uint64_t    C[ALPHABET_SIZE + 1];   /* C[0..15] from file, C[16]=N */
 static uint64_t    N;                       /* bwt_len_total_with_dollar */
@@ -237,30 +266,6 @@ static inline uint64_t encode_jp(uint64_t lo, uint64_t hi)
     return lo | (diff << 34);
 }
 
-/* ── 14-mer table ────────────────────────────────────────────────────────
- *
- *  16^7 = 268,435,456 entries
- *  Each entry corresponds to a 7-symbol base-16 k-mer.
- *
- *  Index encoding: idx = sym[0]*16^6 + ... + sym[6]*16^0
- *  sym[j] = (idx >> (4*j)) & 0xF   (j=0 = rightmost symbol)
- *
- *  Backward search: process sym[6] (leftmost) down to sym[0] (rightmost)
- *  BUT: we enumerate idx in order 0..16^7-1, and within the loop we
- *  need to process the rightmost symbol first. Since sym[j] = (idx>>(4j))&0xF
- *  gives j=0 as rightmost, we iterate j from 0 up to 6.
- *
- *  Wait — backward search goes RIGHT to LEFT:
- *  idx=0 → sym[0..6] all = 0 (rightmost to leftmost all '0')
- *  First step of backward search: sym[6] (leftmost nucleotide in time
- *  but rightmost in BWT order? No...)
- *
- *  Actually for a 7-mer base-16: the query is sym[0]sym[1]...sym[6]
- *  Backward search processes from right to left: sym[6] first, sym[0] last.
- *  sym[6] = (idx >> 0) & 0xF  (j=0 in our formula gives rightmost = sym[6])
- *
- *  So iterating j from 0 to 6 processes sym[6]→sym[0] = right to left. ✓
- */
 static void make_table_14(const char *out_path)
 {
     const uint64_t total = 268435456ULL;   /* 16^7 */
@@ -282,12 +287,6 @@ static void make_table_14(const char *out_path)
 
         uint64_t lo = 0, hi = N;
 
-        /*
-         * Process 7 base-16 symbols right to left.
-         * sym[j] = (idx >> (4*j)) & 0xF  gives rightmost (j=0) first.
-         * j=0: sym[6] of the 7-mer  ← rightmost symbol, processed first ✓
-         * j=6: sym[0] of the 7-mer  ← leftmost symbol, processed last  ✓
-         */
         for (int j = 0; j < 7 && lo < hi; j++) {
             int sym = (int)((idx >> (4u * j)) & 0xFu);
             lo = C[sym] + rank_excl(sym, lo);
@@ -337,44 +336,6 @@ static void make_table_14(const char *out_path)
             out_path, (double)(written*8)/1073741824.0);
 }
 
-/* ── 15-mer table ────────────────────────────────────────────────────────
- *
- *  4^15 = 1,073,741,824 entries
- *  Index: base-4 nucleotide ordering (A=0,C=1,G=2,T=3)
- *  idx = b[0]*4^14 + ... + b[14]*4^0
- *  b[i] = (idx >> (2*(14-i))) & 3    (b[14] = idx & 3 = rightmost NT)
- *
- *  Backward search:
- *  Step 1: rightmost single nucleotide b[14] = idx & 3
- *    sym_lo = 4*b14   (group of 4 base-16 symbols starting with NT b14)
- *    lo = C[sym_lo]
- *    hi = (sym_lo+4 < 16) ? C[sym_lo+4] : N
- *
- *    Rationale: b[14] is a single nucleotide (half a base-16 pair). The
- *    2-step reference encodes NT pair (left,right) → sym = 4*left+right.
- *    So all base-16 symbols with LEFT nucleotide = b14 are {4*b14 .. 4*b14+3}.
- *    The SA range covering all of these is [C[4*b14], C[4*b14+4]).
- *
- *  Steps 2-8: 7 pairs (b[12],b[13]) through (b[0],b[1]) right to left:
- *    For pair step j = 0..6:
- *      b_right = (idx >> (2 + 4*j)) & 3  = b[13-2j+1] = b[14-2j-1] hmm
- *
- *    Let me re-derive:
- *    pair step j=0: processes pair at positions (12,13) in the 15-mer
- *      b_right = b[13] = (idx >> (2*(14-13))) & 3 = (idx >> 2) & 3
- *      b_left  = b[12] = (idx >> (2*(14-12))) & 3 = (idx >> 4) & 3
- *    pair step j=1: positions (10,11)
- *      b_right = b[11] = (idx >> 6) & 3
- *      b_left  = b[10] = (idx >> 8) & 3
- *    pair step j: positions (12-2j, 13-2j)
- *      b_right = (idx >> (2 + 4*j)) & 3
- *      b_left  = (idx >> (4 + 4*j)) & 3
- *    pair step j=6: positions (0,1)
- *      b_right = (idx >> 26) & 3 = b[1]
- *      b_left  = (idx >> 28) & 3 = b[0]
- *
- *    sym = 4*b_left + b_right
- */
 static void make_table_15(const char *out_path)
 {
     const uint64_t total = 1073741824ULL;   /* 4^15 */
@@ -458,24 +419,6 @@ static void make_table_15(const char *out_path)
             out_path, (double)(written*8)/1073741824.0);
 }
 
-/* ── 16-mer table ────────────────────────────────────────────────────────
- *
- *  4^16 = 4,294,967,296 entries
- *  Index: base-4 nucleotide ordering
- *  idx = b[0]*4^15 + ... + b[15]*4^0
- *  b[15] = idx & 3 = rightmost NT
- *
- *  8 pairs right to left: (b[14],b[15]), (b[12],b[13]), ..., (b[0],b[1])
- *  For pair step j = 0..7:
- *    b_right = (idx >> (4*j)) & 3   = b[15-2j] (rightmost of pair)
- *    b_left  = (idx >> (4*j+2)) & 3 = b[14-2j] (leftmost of pair)
- *    sym = 4*b_left + b_right
- *
- *  Verify j=0: b_right=(idx>>0)&3=b[15], b_left=(idx>>2)&3=b[14] ✓
- *  Verify j=7: b_right=(idx>>28)&3=b[1], b_left=(idx>>30)&3=b[0] ✓
- *
- *  lo=0, hi=N (both pairs fully determined, no single-NT init needed)
- */
 static void make_table_16(const char *out_path)
 {
     const uint64_t total = 4294967296ULL;   /* 4^16 */
@@ -549,7 +492,6 @@ static void make_table_16(const char *out_path)
             out_path, (double)(written*8)/1073741824.0);
 }
 
-/* ── main ── */
 int main(int argc, char *argv[])
 {
     if (argc < 6 || argc > 7) {

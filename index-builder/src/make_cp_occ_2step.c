@@ -1,3 +1,32 @@
+/*************************************************************************************
+                           The MIT License
+
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+   Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+
+*****************************************************************************************/
 /*
  * make_cp_occ_2step.c
  *
@@ -6,7 +35,7 @@
  *
  * Reads the raw BINARY BWT from gsufsort-64 (after trimming first entry).
  * Valid symbols: '0'-'9' (0x30-0x39), 'A'-'F' (0x41-0x46), uppercase only.
- * Terminator:    0x00 (null byte) — position advances, no count incremented.
+ * Terminator:    0x00 (null byte): position advances, no count incremented.
  *
  * ── Block layout (128 bytes, OCC_INTERVAL = 32) ───────────────────────────
  *
@@ -58,10 +87,9 @@
 #define WRITE_BUF_BLKS (8192)                 /* blocks per write   */
 #define REPORT_EVERY   500000000ULL           /* progress interval  */
 
-#define RS_OCC_MAGIC   0x52534F434346554CULL  /* "RSOCCFUL" */
+#define RS_OCC_MAGIC   0x52534F434346554CULL  
 #define RS_OCC_VERSION 1u
 
-/* ── structs (must match load_data.c exactly) ── */
 typedef struct {
     uint32_t cp_count[16];   /* 64 bytes: cumulative counts before block  */
     uint32_t one_hot[16];    /* 64 bytes: bitvectors                      */
@@ -77,8 +105,7 @@ typedef struct {
     uint64_t bwt_len_total_with_dollar;
     uint64_t num_blocks;
     int64_t  sentinel_index;
-    uint64_t reserved2;     /* NEW: pads header 56 -> 64 so the cp_occ body
-                               starts 64-byte aligned when mmap'd */
+    uint64_t reserved2;     
 } rs_occ_full_header_t;
 
 _Static_assert(sizeof(rs_occ_full_header_t) == 64,
@@ -86,7 +113,6 @@ _Static_assert(sizeof(rs_occ_full_header_t) == 64,
 _Static_assert(sizeof(cp_occ32_t) == 128,
                "cp_occ block must be exactly 2 cache lines");
                
-/* ── lookup table: byte → symbol index (0-15) or -1 ── */
 static int8_t lut[256];
 
 static void init_lut(void) {
@@ -128,7 +154,6 @@ int main(int argc, char *argv[])
     cp_occ32_t   *wbuf   = (cp_occ32_t *)calloc(WRITE_BUF_BLKS, sizeof(cp_occ32_t));
     if (!rbuf || !wbuf) { fprintf(stderr,"malloc failed\n"); return 1; }
 
-    /* write placeholder header — we seek back and overwrite at the end */
     rs_occ_full_header_t hdr;
     memset(&hdr, 0, sizeof(hdr));
     if (fwrite(&hdr, sizeof(hdr), 1, fout) != 1) {
@@ -204,7 +229,6 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* progress */
         if (pos % REPORT_EVERY < (uint64_t)nread) {
             double el = (double)(clock()-t0)/CLOCKS_PER_SEC;
             fprintf(stderr, "\r[make_cp_occ_2step]  %7lluM  (%.0fs)  "
@@ -264,7 +288,7 @@ int main(int argc, char *argv[])
      * c_vec[k]  = c_vec[k-1] + count(sym k-1)
      *
      * The aligner's read_C_vector() reads exactly 16 values and sets
-     * c_vec[16] = BWT_SIZE_REFERENCE_SIZE itself — we do NOT write that.
+     * c_vec[16] = BWT_SIZE_REFERENCE_SIZE itself
      */
     uint64_t c_vec[ALPHABET_SIZE];
     c_vec[0] = n_term;
@@ -303,7 +327,6 @@ int main(int argc, char *argv[])
     fclose(fbwt); fclose(fout); fclose(fcvec);
     free(rbuf); free(wbuf);
 
-    /* ── summary ── */
     fprintf(stderr, "\n\n[make_cp_occ_2step] done in %.1fs\n", elapsed);
     fprintf(stderr, "  BWT length (total)       = %llu\n",  (unsigned long long)pos);
     fprintf(stderr, "  BWT length (non-dollar)  = %llu\n",  (unsigned long long)bwt_non_dollar);

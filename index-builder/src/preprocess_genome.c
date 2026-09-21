@@ -1,3 +1,32 @@
+/*************************************************************************************
+                           The MIT License
+
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+   Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+
+*****************************************************************************************/
 /*
  * preprocess_genome.c
  *
@@ -5,16 +34,16 @@
  * ready for derive_2stepref (2-step RosaSeed pipeline).
  *
  * What it does:
- *   1. Reads any FASTA — single or multi-chromosome, any line width
+ *   1. Reads any FASTA, single or multi-chromosome, any line width
  *   2. Strips all FASTA headers (lines starting with '>')
  *   3. Converts lowercase to uppercase
  *   4. Replaces ALL non-ACGT characters (N, R, Y, S, W, K, M, B, D, H, V,
  *      and anything else) with 'A'
  *      Rationale: preserves sequence length and coordinates.
  *      Silent dropping (as derive_2stepref does internally) would shift
- *      all coordinates downstream of any N — replaced-with-A does not.
+ *      all coordinates downstream of any N: replaced-with-A does not.
  *   5. Writes output as a single-line plain text file (no FASTA header)
- *      OR as a clean single-header FASTA — controlled by -f flag
+ *      OR as a clean single-header FASTA: controlled by -f flag
  *
  * Usage:
  *   ./preprocess_genome <input.fa> <output.txt> [options]
@@ -97,15 +126,12 @@ int main(int argc, char *argv[])
         fprintf(fout, ">genome\n");
     }
 
-    /* ── stats ── */
     uint64_t n_headers    = 0;
     uint64_t n_bases_read = 0;   /* total ACGT + non-ACGT (before replacement) */
     uint64_t n_replaced_N = 0;   /* N characters replaced with A */
     uint64_t n_replaced_other = 0; /* other ambiguity codes replaced */
     uint64_t n_out        = 0;   /* bases written */
 
-    /* ── lookup table ──
-     * lut[byte] = output byte to write, or 0 = skip (whitespace/header) */
     uint8_t lut[256];
     memset(lut, 0, sizeof(lut));
 
@@ -115,22 +141,19 @@ int main(int argc, char *argv[])
     lut['G'] = lut['g'] = 'G';
     lut['T'] = lut['t'] = 'T';
 
-    /* N → A (replacement, not drop — preserves coordinates) */
+    /* N → A (replacement, not drop: preserves coordinates) */
     lut['N'] = lut['n'] = 'A';
 
     /* IUPAC ambiguity codes → A */
     const char *ambig = "RYSWKMBDHVrysWkmbdhv";
     for (int i = 0; ambig[i]; i++) lut[(uint8_t)ambig[i]] = 'A';
 
-    /* ── state machine ──
-     * in_header: currently consuming a header line, skip until newline */
     int in_header   = 0;
-    size_t w_pos    = 0;        /* write buffer fill level */
+    size_t w_pos    = 0;        
 
     clock_t t0 = clock();
     size_t nread;
 
-    /* print banner */
     fprintf(stderr, "[preprocess_genome]\n");
     fprintf(stderr, "  Input  : %s\n", in_path);
     fprintf(stderr, "  Output : %s\n", out_path);
@@ -141,7 +164,6 @@ int main(int argc, char *argv[])
         for (size_t i = 0; i < nread; i++) {
             uint8_t c = rbuf[i];
 
-            /* ── header line handling ── */
             if (c == '>') {
                 in_header = 1;
                 n_headers++;
@@ -155,11 +177,10 @@ int main(int argc, char *argv[])
             /* ── whitespace: skip silently ── */
             if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
 
-            /* ── classify and replace ── */
             uint8_t out_c = lut[c];
 
             if (out_c == 0) {
-                /* completely unknown character — replace with A */
+                /* completely unknown character, replace with A */
                 out_c = 'A';
                 n_replaced_other++;
             } else if (c == 'N' || c == 'n') {
@@ -172,14 +193,14 @@ int main(int argc, char *argv[])
 
             n_bases_read++;
 
-            /* ── write to buffer ── */
+            /*  write to buffer  */
             wbuf[w_pos++] = out_c;
             if (w_pos == WRITE_BUF_SIZE) {
                 fwrite(wbuf, 1, w_pos, fout);
                 n_out += w_pos;
                 w_pos = 0;
 
-                /* progress every ~500M bases */
+                /* progress report every ~500M bases */
                 if (n_bases_read % 500000000ULL < WRITE_BUF_SIZE) {
                     double el = (double)(clock()-t0)/CLOCKS_PER_SEC;
                     fprintf(stderr, "\r  %.2f Gbp read  (%.0fs)  "
@@ -192,13 +213,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* flush remaining */
     if (w_pos > 0) {
         fwrite(wbuf, 1, w_pos, fout);
         n_out += w_pos;
     }
 
-    /* trailing newline */
     fputc('\n', fout);
 
     double elapsed = (double)(clock()-t0)/CLOCKS_PER_SEC;
@@ -206,7 +225,6 @@ int main(int argc, char *argv[])
     fclose(fin); fclose(fout);
     free(rbuf);  free(wbuf);
 
-    /* ── summary ── */
     uint64_t n_acgt_original = n_bases_read - n_replaced_N - n_replaced_other;
 
     fprintf(stderr, "\r                                                              \r");

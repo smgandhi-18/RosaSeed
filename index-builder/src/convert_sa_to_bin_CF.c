@@ -1,3 +1,33 @@
+/*************************************************************************************
+                           The MIT License
+
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+   Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+
+*****************************************************************************************/
+
 /*
  * convert_sa_to_bin_CF.c
  *
@@ -19,7 +49,6 @@
  *   ./convert_sa_to_bin_CF genome.txt.8.sa /data/index/
  *
  * The SA_N (number of entries) is computed automatically from the file size.
- * No hardcoding needed.
  */
 
 #include <stdio.h>
@@ -131,7 +160,6 @@ static void convert_one_cf(const char *sa_path,
             }
         }
 
-        /* progress after each read chunk even if no flush yet */
         if (row % REPORT_EVERY == 0) {
             double el = (double)(clock()-t0)/CLOCKS_PER_SEC;
             fprintf(stderr, "\r[CF=%d]  row %llu / %llu  %.0fs   ",
@@ -185,7 +213,6 @@ static void convert_one_cf(const char *sa_path,
     fprintf(stderr, "  [OK] CF=%d count matches.\n\n", cf);
 }
 
-/* ── main ───────────────────────────────────────────────────────────────── */
 int main(int argc, char **argv)
 {
     if (argc != 3) {

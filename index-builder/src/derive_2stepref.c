@@ -1,10 +1,39 @@
+/*************************************************************************************
+                           The MIT License
+
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
+   Copyright (C) 2026  University of Alberta, Gandhi Shyama.
+
+   Permission is hereby granted, free of charge, to any person obtaining
+   a copy of this software and associated documentation files (the
+   "Software"), to deal in the Software without restriction, including
+   without limitation the rights to use, copy, modify, merge, publish,
+   distribute, sublicense, and/or sell copies of the Software, and to
+   permit persons to whom the Software is furnished to do so, subject to
+   the following conditions:
+
+   The above copyright notice and this permission notice shall be
+   included in all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+   BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
+
+*****************************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 #define MAX_REF_LEN      7000000000ULL    /* allocation cap */
-#define RS_MAX_GENOME_BP 4294967296ULL    /* 2^32 — real format limit */
+#define RS_MAX_GENOME_BP 4294967296ULL    /* 2^32: real format limit */
 #define WRITE_BUF_SIZE (1 << 20)    // 1 MB write buffer
 #define LINE_LEN 80                 // FASTA line width
 
@@ -37,7 +66,7 @@ char encode_pair(char n1, char n2) {
     return (code < 10) ? ('0' + code) : ('A' + (code - 10));
 }
 
-// ---------- Base-4 Reverse Complement Generation (NEW) ----------
+// ---------- Base-4 Reverse Complement Generation ----------
 // Generates the true reverse complement of the original Base-4 (ACGT) reference.
 void generate_base4_reverse_complement(const char *ref_in, char *ref_rc) {
     size_t len = strlen(ref_in);
@@ -98,9 +127,6 @@ void print_segment_info(const char *name, const char *seq) {
     }
 }
 
-// NOTE: The previous build_reverse_complement function is removed as it RC'd the Base-16 string, which is now replaced by the more robust method in main().
-
-// ---------- FASTA reading ----------
 char* read_fasta(const char *filename) {
     FILE *fp = fopen(filename, "r");
     if (!fp) {
@@ -134,7 +160,6 @@ char* read_fasta(const char *filename) {
     return seq;
 }
 
-// ---------- FASTA writing (optimized, buffered) ----------
 void write_fasta(const char *filename, const char *header, const char *seq) {
     FILE *fp = fopen(filename, "w");
     if (!fp) {
@@ -171,7 +196,6 @@ void write_fasta(const char *filename, const char *header, const char *seq) {
     fclose(fp);
 }
 
-// ---------- main driver ----------
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <reference.fasta>\n", argv[0]);
