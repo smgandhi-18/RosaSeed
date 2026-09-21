@@ -62,7 +62,7 @@ RosaSeed/
 | zlib development headers | Linked with `-lz` (`zlib1g-dev` on Ubuntu) |
 | x86-64 CPU, SSE4.1 or newer | AVX2 (or AVX-512) is strongly recommended for alignment speed. `arch=native` builds for the CPU it is compiled on and does not itself require AVX2 |
 | Linux | Uses `mmap` and pthreads |
-| RAM: ~50 GB (alignment) | ~49.6 GB combined peak at alignment time with the recommended configuration. The [Memory-efficient](#memory-efficient) build (`-DSA_COMPRESSION_FACTOR_POWER=3`) cuts index memory to ~35 GB and suits 48 GB systems — see [Genome size limits](#genome-size-limits) |
+| RAM: ~50 GB (alignment) | ~49.6 GB combined peak at alignment time with the recommended configuration. The [Memory-efficient](#memory-efficient) build (`-DSA_COMPRESSION_FACTOR_POWER=3`) cuts index memory to ~35 GB and suits 48 GB systems, see [Genome size limits](#genome-size-limits) |
 | RAM: ~64 GB (index building) | Only needed to build indexes: ~56 GB for the RosaSeed index, ~62 GB for `bwa-mem2 index` (human genome) |
 
 **Install on Ubuntu/Debian:**
@@ -204,8 +204,8 @@ re-checks at startup so an index built elsewhere cannot be used silently.
 ## Flags reference
 
 RosaSeed is controlled through two mechanisms:
-- **Build-time flags** (`-D` flags via `CPPFLAGS_EXTRA`) — select algorithms and data structures at compile time
-- **Runtime flags** (`--rs-*` and standard BWA-MEM2 flags) — tune thresholds at run time
+- **Build-time flags** (`-D` flags via `CPPFLAGS_EXTRA`): select algorithms and data structures at compile time
+- **Runtime flags** (`--rs-*` and standard BWA-MEM2 flags): tune thresholds at run time
 
 ---
 
@@ -402,7 +402,7 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 | vs Minimap2 | 4.8× | 2.48× |
 | vs Bowtie2 | 33.2× | 10.8× |
 
-Peak memory: **49.61 GB** — ~25% less than ERT/ERT2 (~66.3 GB each).
+Peak memory: **49.61 GB**, ~25% less than ERT/ERT2 (~66.3 GB each).
 This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
 index files (~6.9 GB) required by the downstream chaining and alignment
 extension pipeline.
