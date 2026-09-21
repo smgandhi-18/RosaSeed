@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -119,9 +119,6 @@ static char path_sa_bin[1024];
 static char path_msb_bin[1024];
 static char path_occ_bin[1024];
 
-/* -----------------------------------------------------------------------
-   Helpers 
-   ----------------------------------------------------------------------- */
 static inline uint8_t rosaseed_to_b4(unsigned char c)
 {
     if (c <= 3) return c;
@@ -196,9 +193,6 @@ static void rosaseed_core_ensure_thread_buffers(int64_t max_hits_for_call,
 
 /* -----------------------------------------------------------------------
    Helper: run everything AFTER Phase I for one read.
-   Extracted so both the serial path and the batch path can call it
-   without duplicating the #ifdef ENABLE_PHASE_II / gap_fill logic.
-   matchArray must already contain the Phase I seeds (numberofSMEMs).
    On return, totalsmems_out holds the final count.
    ----------------------------------------------------------------------- */
 static void run_post_phaseI(
@@ -347,9 +341,6 @@ static int64_t materialise_hits(
     return out_count;
 }
 
-/* -----------------------------------------------------------------------
-   rosaseed_core_seed_one_read()
-   ----------------------------------------------------------------------- */
 int64_t rosaseed_core_seed_one_read(
     const char *seq,
     int read_len,
@@ -463,7 +454,7 @@ int64_t rosaseed_core_seed_batch_interleaved(
     uint32_t *seed_counts  = tl_seed_counts;
 
     int64_t total_hits_out = 0;
-    int     base           = 0;   /* index of first read in current micro-batch */
+    int     base           = 0;   
 
     while (base < nreads) {
 
@@ -670,14 +661,10 @@ int rosaseed_core_init(const rosaseed_core_config_t *cfg)
     return 0;
 }
 
-/* -----------------------------------------------------------------------
-   rosaseed_core_destroy()
-   ----------------------------------------------------------------------- */
 void rosaseed_core_destroy(void)
 {
     if (!g_rosaseed_core_initialized) return;
 
-    /* free per-slot match arrays if allocated */
     if (tl_batch_bufs_ready) {
         for (int s = 0; s < RS_BATCH; ++s) {
             if (tl_batch_matchArrays[s]) {
@@ -692,9 +679,6 @@ void rosaseed_core_destroy(void)
     g_rosaseed_core_initialized = 0;
 }
 
-/* -----------------------------------------------------------------------
-   rosaseed_core_print_timing()
-   ----------------------------------------------------------------------- */
 void rosaseed_core_print_timing(double proc_freq)
 {
     fprintf(stderr, "Phase I        : %.3f sec\n",

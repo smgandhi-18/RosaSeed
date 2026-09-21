@@ -1,7 +1,7 @@
 /*************************************************************************************
                            The MIT License
 
-   RosaSeed (Fast and Configurable seeding for short-read alignment),
+   RosaSeed (RosaSeed: Faster and Accurate Short Read Alignment Using a Configurable Seeding Strategy),
    Copyright (C) 2026  University of Alberta, Gandhi Shyama.
 
    Permission is hereby granted, free of charge, to any person obtaining
@@ -77,7 +77,7 @@ int64_t rosaseed_core_seed_batch_interleaved(
     int          nreads,
     rosaseed_core_hit_t *hits,
     int64_t      max_hits,
-    int64_t     *hit_offsets   /* can be NULL if you don't need per-read offsets */
+    int64_t     *hit_offsets   /* can be NULL if don't need per-read offsets */
 );
 
 #ifdef __cplusplus
