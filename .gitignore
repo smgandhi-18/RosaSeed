@@ -38,3 +38,8 @@ ext/**/.git
 
 src/rosaseed/*.o
 src/rosaseed/*.a
+
+# IDE and Python caches
+.vscode/
+__pycache__/
+*.pyc

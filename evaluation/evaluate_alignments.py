@@ -2,10 +2,6 @@
 import pysam
 import sys
 
-# ----------------------------------------------------------------------
-# Utility Functions
-# ----------------------------------------------------------------------
-
 def compute_nm_from_cigar(read):
     """Approximate NM tag from CIGAR if NM tag missing."""
     if read is None or read.cigartuples is None:
@@ -81,18 +77,20 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
     truth = open_alignment(reference_sam)
     align = open_alignment(test_sam)
 
+    # Key must stay (QNAME, mate): paired mates share a QNAME, so keying on the
+    # name alone drops one mate per pair and can compare truth R2 against test R1.
     truth_dict = {
-        r.query_name: r
+        (r.query_name, r.is_read1): r
         for r in truth.fetch(until_eof=True)
         if (not r.is_secondary) and (not r.is_supplementary)
     }
     align_dict = {
-        r.query_name: r
+        (r.query_name, r.is_read1): r
         for r in align.fetch(until_eof=True)
         if (not r.is_secondary) and (not r.is_supplementary)
     }
 
-    all_qnames = set(truth_dict.keys()) | set(align_dict.keys())
+    all_keys = set(truth_dict.keys()) | set(align_dict.keys())
 
     # Strict (±5 bp)
     TP = FP = FN = TN = 0
@@ -128,10 +126,17 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
     standard_fp_ids = []
     strict_fp_ids = []
 
-    for qname in all_qnames:
-        t_read = truth_dict.get(qname)   # BWA-MEM2 in your current usage
-        a_read = align_dict.get(qname)   # Rosaseed in your current usage
+    for key in all_keys:
+        qname = key[0]
+        t_read = truth_dict.get(key)   # BWA-MEM2 in your current usage
+        a_read = align_dict.get(key)   # Rosaseed in your current usage
         total += 1
+
+        # Label used in the dumped read-ID lists: name/1, name/2 when paired,
+        # plain name for single-end.
+        _rec = t_read if t_read is not None else a_read
+        read_id = (f"{qname}/{1 if _rec.is_read1 else 2}"
+                   if (_rec is not None and _rec.is_paired) else qname)
 
         # Treat missing record like unmapped for bookkeeping
         t_missing_or_unmapped = (t_read is None) or t_read.is_unmapped
@@ -139,8 +144,6 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
 
         if a_missing_or_unmapped:
             not_mapped += 1
-
-        if a_read is None:
             unmapped_aligner += 1
 
         # Case 1: both missing/unmapped
@@ -154,7 +157,6 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
             FN += 1
             FN50 += 1
             if a_read is not None and a_read.is_unmapped:
-                unmapped_aligner += 1
                 FN_align_recs.append(a_read)
             if t_read is not None:
                 FN_truth_recs.append(t_read)
@@ -164,10 +166,10 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
         elif t_missing_or_unmapped and (not a_missing_or_unmapped):
             FP += 1
             FP50 += 1
-            strict_fp_ids.append(qname)
-            standard_fp_ids.append(qname)
+            strict_fp_ids.append(read_id)
+            standard_fp_ids.append(read_id)
 
-            test_only_mapped_ids.append(qname)
+            test_only_mapped_ids.append(read_id)
             if t_read is not None:
                 test_only_truth_recs.append(t_read)
             if a_read is not None:
@@ -198,13 +200,13 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
                 TP += 1
             else:
                 FP += 1
-                strict_fp_ids.append(qname)
+                strict_fp_ids.append(read_id)
 
             if same_ref and same_strand and (pos_diff <= tol_standard):
                 TP50 += 1
             else:
                 FP50 += 1
-                standard_fp_ids.append(qname)
+                standard_fp_ids.append(read_id)
 
         # Structural accuracy (mapped alignments only)
         if (a_read is not None) and (not a_read.is_unmapped) and (t_read is not None):

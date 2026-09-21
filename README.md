@@ -57,21 +57,25 @@ RosaSeed/
 
 | Requirement | Notes |
 |---|---|
-| GCC / g++ ≥ 7 | C++14 support required |
+| g++ with C++14 support | Tested with GCC 15.2; the sources also compile as C++11. `src/rosaseed/*.c` are compiled with `g++` (`-fpermissive`), so a C++ compiler is required, not just a C compiler |
 | GNU Make | Standard build |
-| x86-64 with AVX2 | Required for `arch=native` |
-| RAM ≥ 64 GB | ~50 GB peak at alignment time — see [Genome size limits](#genome-size-limits) |
+| zlib development headers | Linked with `-lz` (`zlib1g-dev` on Ubuntu) |
+| x86-64 CPU, SSE4.1 or newer | AVX2 (or AVX-512) is strongly recommended for alignment speed. `arch=native` builds for the CPU it is compiled on and does not itself require AVX2 |
+| Linux | Uses `mmap` and pthreads |
+| RAM: ~50 GB (alignment) | ~49.6 GB combined peak at alignment time with the recommended configuration. The [Memory-efficient](#memory-efficient) build (`-DSA_COMPRESSION_FACTOR_POWER=3`) cuts index memory to ~35 GB and suits 48 GB systems — see [Genome size limits](#genome-size-limits) |
+| RAM: ~64 GB (index building) | Only needed to build indexes: ~56 GB for the RosaSeed index, ~62 GB for `bwa-mem2 index` (human genome) |
+
+**Install on Ubuntu/Debian:**
+
+```bash
+sudo apt install gcc g++ make git zlib1g-dev
+```
 
 **Index builder additional requirements:**
 
 ```bash
-sudo apt install gcc make git python3 python3-pip
-pip install numpy
+sudo apt install python3 python3-numpy
 ```
-
-RAM: ~64 GB minimum (peak ~56 GB during RosaSeed index construction for the
-T2T gapless human genome). The BWA-MEM2 index build (`bwa-mem2 index`)
-requires ~62 GB RAM for the human genome.
 
 ---
 
@@ -150,7 +154,7 @@ Build time: ~44 minutes, peak RAM ~56 GB.
 ```
 
 > **Note:** The FASTA path supplied to `./bwa-mem2 mem` must be the same
-> one used in Step 3 — BWA-MEM2 looks for its index files (`.0123`, `.pac`
+> one used in Step 3. BWA-MEM2 looks for its index files (`.0123`, `.pac`
 > etc.) in the same directory as the FASTA.
 
 ---
@@ -462,16 +466,22 @@ RosaSeed is built on [BWA-MEM2](https://github.com/bwa-mem2/bwa-mem2)
 by Vasimuddin Md, Sanchit Misra, Heng Li, and Chirag Jain.
 RosaSeed uses [gsufsort](https://github.com/felipelouza/gsufsort)
 by Louza et al. to construct SA and BWT during index construction.
+RosaSeed bundles [safestringlib](https://github.com/intel/safestringlib)
+by Intel Corporation, inherited from BWA-MEM2, for bounds-checked string
+and memory operations.
 
 ---
 
 ## License
 
 RosaSeed: MIT License.
-Copyright (c) 2026 Shyama Gandhi, University of Alberta.
+Copyright (c) 2026 Shyama Gandhi, Bruce F. Cockburn, University of Alberta.
 
 BWA-MEM2 components: MIT License.
 Copyright (c) 2019 Vasimuddin Md, Sanchit Misra, Heng Li, Chirag Jain.
+
+safestringlib (bundled in `ext/safestringlib/`): MIT License.
+Copyright (c) 2014-2018 Intel Corporation; Copyright (c) 2012, 2013 Cisco Systems.
 
 gsufsort: GPL-3.0 License.
 Copyright (c) 2020 Louza, F.A., Telles, G.P., Gog, S., Prezza, N., Rosone, G.

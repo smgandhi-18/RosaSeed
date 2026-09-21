@@ -138,7 +138,7 @@ extern uint32_t   *mask32;     // [33] prefix masks for 32-bit windows
 
 #define RS_OCC_VERSION 1u
 #define RS_MAX_BWT_LEN   8589934592ULL   /* 2^33 — see README, genome size limits */
-#define RS_MAX_GENOME_BP 4294967296ULL   /* 2^32 bp ≈ 4.29 Gbp              
+#define RS_MAX_GENOME_BP 4294967296ULL   /* 2^32 bp ≈ 4.29 Gbp   */           
 #define RS_OCC_MAGIC 0x52534F434346554CULL   /* "RSOCCFUL" — must match make_cp_occ_2step.c */
 
 typedef struct {

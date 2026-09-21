@@ -182,7 +182,7 @@ for cmd in gcc make git python3; do
 done
 python3 -c "import numpy" 2>/dev/null \
     && ok "python3 numpy" \
-    || die "numpy not found. Install: pip install numpy"
+    || die "numpy not found. Install: sudo apt install python3-numpy"
 
 # =============================================================================
 step "[ 2/15 ] Compiling tools"

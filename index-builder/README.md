@@ -1,6 +1,6 @@
 # 2-step RosaSeed FM-index Build Pipeline
 
-Builds a complete FM-index from any FASTA genome file for the 2-step RosaSeed GPU short-read aligner.
+Builds a complete FM-index from any FASTA genome file for the 2-step RosaSeed.
 
 ## Repository structure
 
@@ -26,8 +26,7 @@ gsufsort is downloaded and compiled automatically if not already present.
 ## Requirements
 
 ```bash
-sudo apt install gcc make git python3 python3-pip
-pip install numpy
+sudo apt install gcc make git python3 python3-numpy
 ```
 
 ## Quick start
