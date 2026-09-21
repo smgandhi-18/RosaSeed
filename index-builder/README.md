@@ -36,7 +36,7 @@ git clone <this-repo> rosaseed-index
 cd rosaseed-index
 chmod +x build_2step_pipeline.sh
 
-# Build index — 14+15-mer jump tables by default
+# Build index: 14+15-mer jump tables by default
 ./build_2step_pipeline.sh /path/to/genome.fna
 ```
 
@@ -56,20 +56,20 @@ Options:
                15      15-mer only  ( 8 GiB output, ~25 min)
                16      16-mer only  (32 GiB output, ~20 min)
                all     14 + 15 + 16
-               14,15   default — recommended for most read lengths
+               14,15   default: recommended for most read lengths
   -h         Help
 ```
 
 ## Examples
 
 ```bash
-# T2T CHM13 — default 14+15-mer tables, auto output directory
+# T2T CHM13: default 14+15-mer tables, auto output directory
 ./build_2step_pipeline.sh GCF_009914755.1_T2T-CHM13v2.0_genomic.fna
 
 # Custom output directory, all three jump tables
 ./build_2step_pipeline.sh -o /data/T2T_index -j all T2T_CHM13.fna
 
-# GRCh38 — 15-mer only, keep original SA file
+# GRCh38: 15-mer only, keep original SA file
 ./build_2step_pipeline.sh -k -j 15 -o /scratch/hg38_index hg38.fa
 ```
 
@@ -116,7 +116,7 @@ Options:
 >
 > The pipeline prints an observed peak RSS at the end of each run.
 > The RSS monitor samples every 1 second; gsufsort's true peak may be slightly
-> higher than the reported value — use your system resource monitor for
+> higher than the reported value, use your system resource monitor for
 > independent confirmation.
 
 ## Pipeline steps
@@ -132,7 +132,7 @@ Options:
 [ 8/15 ] Run gsufsort               SA + BWT construction  (~25 min, ~56 GB RAM)
 [ 9/15 ] Trim first entry           remove null terminator in-place from SA + BWT
 [10/15 ] Verify BWT                 base-16 char counts, 1 terminator, no junk
-[11/15 ] Compressed SA files        CF=1,2,4,8 — 5-byte split per entry
+[11/15 ] Compressed SA files        CF=1,2,4,8: 5-byte split per entry
 [12/15 ] Delete original SA         frees ~50 GB  (use -k to keep)
 [13/15 ] cp_occ_full.bin            OCC checkpoint + bitvector file (~25 GB)
 [14/15 ] ref16_packed.bin           nibble-packed base-16 reference (~3 GB)
@@ -170,7 +170,7 @@ Options:
 ## Non-ACGT character handling
 
 N and all IUPAC ambiguity codes (R,Y,S,W,K,M,B,D,H,V) are replaced with `A`.  
-Sequence length is preserved — genome coordinates remain intact.  
+Sequence length is preserved, genome coordinates remain intact.  
 Reads may align to replaced regions; exclude those chromosomes from the input FASTA if needed.
 
 ## The 2-step encoding
