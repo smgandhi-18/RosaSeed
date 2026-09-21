@@ -265,8 +265,10 @@ static uint64_t load_occ_full_binary_mmap(const char *path)
         exit(EXIT_FAILURE);
     }
 
+    /* floor(N/32) + 1 blocks, so GET_OCC32 can read block (pos >> 5) for
+       every pos in 0..N. Must match make_cp_occ_2step.c. */
     uint64_t expected_blocks =
-        (hdr.bwt_len_non_dollar + OCC_INTERVAL - 1) / OCC_INTERVAL;
+        hdr.bwt_len_total_with_dollar / OCC_INTERVAL + 1;
     if (hdr.num_blocks != expected_blocks) {
         fprintf(stderr,
             "Error: OCC block mismatch: header=%llu expected=%llu\n",
@@ -503,8 +505,10 @@ static uint64_t load_occ_full_binary(const char *path)
         fprintf(stderr, "Error: OCC full binary metadata mismatch\n");
         exit(EXIT_FAILURE);
     }
+    /* floor(N/32) + 1 blocks, so GET_OCC32 can read block (pos >> 5) for
+       every pos in 0..N. Must match make_cp_occ_2step.c. */
     uint64_t expected_blocks =
-        (hdr.bwt_len_non_dollar + OCC_INTERVAL - 1) / OCC_INTERVAL;
+        hdr.bwt_len_total_with_dollar / OCC_INTERVAL + 1;
     if (hdr.num_blocks != expected_blocks) {
         fprintf(stderr,
             "Error: OCC block mismatch: header blocks=%llu expected=%llu\n",

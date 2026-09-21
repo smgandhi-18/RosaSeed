@@ -241,17 +241,23 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* ── flush last partial block (remainder < OCC_INTERVAL) ── */
+    /* ── flush final block: always emit floor(N/32) + 1 blocks ──
+     * The aligner's GET_OCC32 reads block (pos >> 5) and queries every
+     * position 0..N inclusive (the last symbol range ends at C[16] = N).
+     *   remainder != 0: the partially filled block; bits for positions
+     *                   remainder..31 are already 0.
+     *   remainder == 0: every block is full, so emit a terminal block with
+     *                   the final cumulative counts and no bits set.
+     */
     uint32_t remainder = (uint32_t)(pos & (OCC_INTERVAL - 1));
-    if (remainder != 0) {
-        /*
-         * Bits for positions remainder..31 are already 0 (blk was zeroed
-         * at the start of this block). The partial block is valid because
-         * queries never exceed pos-1.
-         */
-        wbuf[wbuf_n++] = blk;
-        blocks_written++;
+    if (remainder == 0) {
+        for (int s = 0; s < ALPHABET_SIZE; s++) {
+            blk.cp_count[s] = (uint32_t)running[s];
+            blk.one_hot[s]  = 0u;
+        }
     }
+    wbuf[wbuf_n++] = blk;
+    blocks_written++;
 
     /* flush write buffer */
     if (wbuf_n > 0) {
@@ -304,8 +310,9 @@ int main(int argc, char *argv[])
 
     /* ── fill in real header and seek back to write it ── */
     uint64_t bwt_non_dollar = pos - n_term;
-    uint64_t num_blocks_expected =
-        (bwt_non_dollar + OCC_INTERVAL - 1) / OCC_INTERVAL;
+    /* The $ row occupies a slot, so blocks cover all N rows plus the query
+       position N itself. Must match the aligner's check in load_data_mmap.c. */
+    uint64_t num_blocks_expected = pos / OCC_INTERVAL + 1;
 
     hdr.magic                    = RS_OCC_MAGIC;
     hdr.version                  = RS_OCC_VERSION;
@@ -338,8 +345,8 @@ int main(int argc, char *argv[])
             (unsigned long long)num_blocks_expected);
     fprintf(stderr, "  blocks written           = %llu\n",
             (unsigned long long)blocks_written);
-    fprintf(stderr, "  last block remainder     = %u positions\n",
-            remainder ? remainder : OCC_INTERVAL);
+    fprintf(stderr, "  last block remainder     = %u positions%s\n",
+            remainder, remainder ? "" : "  (terminal block)");
     fprintf(stderr, "  output file size         = %llu bytes  (%.2f GB)\n",
             (unsigned long long)(sizeof(rs_occ_full_header_t) +
                                  blocks_written * sizeof(cp_occ32_t)),
@@ -374,7 +381,11 @@ int main(int argc, char *argv[])
 
     #undef CHK
 
-    if (ok) fprintf(stderr, "\n  All checks passed. Ready to use.\n");
+    if (!ok) {
+        fprintf(stderr, "\n  [ERROR] Sanity check failed; cp_occ_full.bin is not usable.\n");
+        return EXIT_FAILURE;
+    }
+    fprintf(stderr, "\n  All checks passed. Ready to use.\n");
 
     return EXIT_SUCCESS;
 }
