@@ -343,7 +343,7 @@ void load_bwt_data_structures(void)
 
     fprintf(stderr, "\n[LOAD] Starting parallel mmap index load (MAP_POPULATE)...\n");
 
-    /* c_vec — tiny text file, load instantly on main */
+    /* c_vec: tiny text file, load instantly on main */
     {
         FILE *fc = fopen(C_VEC_FILE, "r");
         if (!fc) { perror("open C-vector"); exit(1); }
@@ -371,7 +371,7 @@ void load_bwt_data_structures(void)
 
     const size_t sa_n = (size_t)SA_SAMPLED_SIZE;
 
-    /* Set up mmap tasks — one per large file */
+    /* Set up mmap tasks: one per large file */
     MmapTask task_sa_ls = {
         .path       = SA_LS_WORD_BIN_FILE,
         .skip_bytes = 0,
@@ -461,7 +461,7 @@ void load_bwt_data_structures(void)
 
     fprintf(stderr,
         "\n[LOAD] All structures mmap'd in %.2f sec wall time\n"
-        "       (second run will be faster — pages remain in page cache)\n\n",
+        "       (second run will be faster: pages remain in page cache)\n\n",
         wall_elapsed);
 
     fprintf(stderr, "Jump table loaded: %zu entries\n",

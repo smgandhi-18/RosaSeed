@@ -604,7 +604,7 @@ void phaseI_routine(
 
    Design principle: hide BWT RAM latency by interleaving FM steps across
    RS_BATCH reads.  After every single fm_step2_b4() call we know the new
-   l and h — we immediately prefetch cp_occ[l>>5] and cp_occ[h>>5] for
+   l and h: we immediately prefetch cp_occ[l>>5] and cp_occ[h>>5] for
    THAT read, then move to the next read's step.  
    ======================================================================= */
 
@@ -683,7 +683,7 @@ static void phaseI_slot_init(
 
     const int E0_base = read_len - 1;
 
-    /* ---- strand probe + first jump — same logic as phaseI_routine ---- */
+    /* ---- strand probe + first jump, same logic as phaseI_routine ---- */
     uint64_t l_f = 0, h_f = 0, diff_f = 0;
     uint64_t l_r = 0, h_r = 0, diff_r = 0;
 
@@ -741,7 +741,7 @@ static inline void phaseI_slot_emit_seed(
     PhaseI_PivotState *st,
     int seed_end_base,
     int seed_len_bases,
-    int interval,         /* (int)(h-l) — 0 means unique (use 1)   */
+    int interval,         /* (int)(h-l): 0 means unique (use 1)   */
     int is_unique)
 {
     const int read_len      = st->read_len;
@@ -806,8 +806,8 @@ static inline void phaseI_slot_emit_seed(
    non-FM action: jump, unique-branch ref_walk, or pivot advance).
 
    Returns:
-     1  — slot still has work to do, caller should continue scheduling it
-     0  — slot is done (pivot_base went negative / pruned), caller removes it
+     1 : slot still has work to do, caller should continue scheduling it
+     0 : slot is done (pivot_base went negative / pruned), caller removes it
    ----------------------------------------------------------------------- */
 static int phaseI_slot_step(PhaseI_PivotState *st)
 {
@@ -881,13 +881,13 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
                 emitted = 1;
                 phaseI_slot_emit_seed(st,
                     st->seed_end_base, st->seed_len_bases,
-                    1 /*interval — unused for unique*/, 1 /*is_unique*/);
+                    1 /*interval: unused for unique*/, 1 /*is_unique*/);
             }
 
             st->pivot_base = next_pivot_after_seed_base(
                 st->seed_end_base, st->seed_len_bases, emitted);
 
-            /* check exit conditions — same as phaseI_routine */
+            /* check exit conditions: same as phaseI_routine */
             if (st->pivot_base < JT_LEN_NT - 1) { st->pivot_base = -1; return 0; }
             if (st->pivot_base + 1 < min_seed_a) { st->pivot_base = -1; return 0; }
 
@@ -921,7 +921,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
     if (st->phase == 1) {
 
         if (st->fm_loop_done) {
-            /* FM loop already finished — go to emit phase */
+            /* FM loop already finished: go to emit phase */
             st->phase = 2;
             return 1;
         }
@@ -942,7 +942,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
                 st->h = bestH;
                 st->read_idx_base = idx_before - 1;
                 st->seed_len_bases += 1;
-                /* rescue exits the FM loop — same as original */
+                /* rescue exits the FM loop: same as original */
                 st->fm_loop_done = 1;
                 st->phase = 2;
                 return 1;
@@ -951,7 +951,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
 #endif
 
         if (!step_ok) {
-            /* rollback — identical to original */
+            /* rollback: identical to original */
             st->l = L_before;
             st->h = H_before;
             st->read_idx_base = idx_before;
@@ -965,7 +965,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
         st->diff = st->h - st->l;
 
         if (st->diff == 1) {
-            /* became unique mid-extension — do ref_walk immediately
+            /* became unique mid-extension: do ref_walk immediately
                (same logic as original, sequential memory access) */
             uint64_t ref_pos = reconstruct_ref_base_index(st->l);
             int mismatch_base = -1, new_read_idx = st->read_idx_base;
@@ -993,7 +993,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
             return 1;
         }
 
-        /* more FM steps to do — prefetch the NEXT step's cp_occ blocks
+        /* more FM steps to do: prefetch the NEXT step's cp_occ blocks
            before yielding so the scheduler can work on other slots      */
         __builtin_prefetch((const char *)&cp_occ[st->l >> 5],      0, 1);
         __builtin_prefetch((const char *)&cp_occ[st->l >> 5] + 64, 0, 1);
@@ -1005,7 +1005,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
     }
 
     /* ================================================================
-       PHASE 2: FM loop done — reconstruct ref_after if needed, emit seed,
+       PHASE 2: FM loop done: reconstruct ref_after if needed, emit seed,
                 advance to next pivot
        ================================================================ */
     if (st->phase == 2) {

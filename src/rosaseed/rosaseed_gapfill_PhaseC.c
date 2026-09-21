@@ -202,7 +202,7 @@ int run_single_pivot(
     int             active_strand,
     int             read_len_bases)
 {
-    const int min_seed_bc = g_min_seed_len_BC;   /* local const — register-friendly */
+    const int min_seed_bc = g_min_seed_len_BC;  
     if (pivot_base < JT_LEN_NT - 1)            return 0;
     if (pivot_base + 1 < min_seed_bc) return 0;
 
@@ -385,7 +385,7 @@ typedef struct {
     int      valid;            /* 1 = slot was successfully initialised
                                    in PASS 2 and should be considered
                                    for emission in PASS 4. Explicitly
-                                   set — never read uninitialised.       */
+                                   set: never read uninitialised.       */
 
     uint64_t l, h, diff;
     int      seed_end_base;
@@ -416,9 +416,9 @@ static inline int gf_pivot_step(
 {
     /* Phase 0: initial jump (called once per pivot) */
     if (sl->phase == 0) {
-        /* jump table already done in setup — go straight to s-step */
+        /* jump table already done in setup, go straight to s-step */
         if (sl->diff == 1) {
-            /* unique at jump — ref_walk handles extension, no s-steps */
+            /* unique at jump, ref_walk handles extension, no s-steps */
             sl->unique_at_jump = 1;
             sl->phase = 2;  /* go to emit */
             return 0;
@@ -489,7 +489,7 @@ static inline int gf_pivot_step(
             return 0;
         }
 
-        /* more s-steps — prefetch next cp_occ before yielding */
+        /* more s-steps, prefetch next cp_occ before yielding */
         __builtin_prefetch((const char *)&cp_occ[sl->l >> 5],      0, 1);
         __builtin_prefetch((const char *)&cp_occ[sl->l >> 5] + 64, 0, 1);
         __builtin_prefetch((const char *)&cp_occ[sl->h >> 5],      0, 1);
@@ -497,7 +497,6 @@ static inline int gf_pivot_step(
         return 1;   
     }
 
-    /* Phase 2: done — caller handles emit */
     return 0;
 }
 
@@ -564,7 +563,7 @@ static int run_gap_pivots(
         if (strand_pivot < min_pivot) continue;   /* leave inactive */
         uint64_t addr = compute_jumpN_from_base4(pat, strand_pivot, JT_LEN_NT);
         __builtin_prefetch(&jump_pointers[addr], 0, 1);
-        slots[i].active = 1;   /* candidate — still needs PASS 2 validation */
+        slots[i].active = 1;   /* candidate: still needs PASS 2 validation */
     }
 
     /* PASS 2: read warm jump entries, init slots, prefetch first cp_occ */
@@ -773,13 +772,13 @@ static void process_gap(
     #endif
     
     if (!run_pass2) {
-        GF_PRINT(" — gap COVERED, skipping PASS2\n");
+        GF_PRINT(" —> gap COVERED, skipping PASS2\n");
         return;
     }
     
     GF_PRINT(covered_after_p1
-             ? " — gap COVERED, but PASS2 forced\n"
-             : " — gap still OPEN\n");
+             ? " —> gap COVERED, but PASS2 forced\n"
+             : " —> gap still OPEN\n");
     
     GF_PRINT("    [PASS2 strand=%d]\n", opposite_strand);
     

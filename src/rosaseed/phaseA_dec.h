@@ -47,7 +47,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 /*
  * Everything phaseI_routine uses as "local" state for one read.
  * The probe function fills chosen_strand / l0 / h0 / d0 and sets
- * done=0.  The bridge then calls phaseI_routine normally — the
+ * done=0.  The bridge then calls phaseI_routine normally, the
  * probe result is NOT passed back in; phaseI_routine recomputes
  * the first jump internally (it is O(1) table lookup so the cost
  * is negligible compared to the FM extension that follows).

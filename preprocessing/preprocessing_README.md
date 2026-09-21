@@ -1,4 +1,4 @@
-# Read preprocessing — ambiguous-base (N) filtering
+# Read preprocessing: ambiguous-base (N) filtering
 
 Before alignment, all sequencing datasets used in the RosaSeed evaluation are
 preprocessed to remove reads containing ambiguous or non-canonical bases (any

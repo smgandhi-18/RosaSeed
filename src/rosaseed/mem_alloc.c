@@ -71,7 +71,7 @@ void allocate_memory() {
         exit(EXIT_FAILURE);
     }
 
-    // SA arrays — size depends on compression factor
+    // SA arrays: size depends on compression factor
     // CF=1: full N entries.  CF=2: N/2.  CF=4: N/4.  CF=8: N/8.
     const size_t sa_n = (size_t)SA_SAMPLED_SIZE;
     int rc=0;
@@ -128,8 +128,6 @@ void allocate_memory() {
 }
 
 void free_memory() {
-    /* sa_ls_word, sa_ms_byte, jump_pointers, ref16_packed, cp_occ
-       are now mmap regions — must use munmap */
     unmap_all_index_regions();
     sa_ls_word    = NULL;
     sa_ms_byte    = NULL;
