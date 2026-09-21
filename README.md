@@ -350,7 +350,7 @@ make arch=native CXX=g++ ROSASEED=1 \
 
 ### Memory-efficient
 
-Reduces index memory to ~35 GB by using 8× SA compression.
+Reduces index memory using 8× SA compression.
 Suitable for systems with 48 GB RAM.
 
 ```bash
