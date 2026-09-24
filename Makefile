@@ -63,6 +63,9 @@ LIBS=		-lpthread -lm -lz -L. -lbwa -Lext/safestringlib -lsafestring $(STATIC_GCC
 # 2-step RosaSeed:
 #   make arch=native CXX=g++ ROSASEED=1
 #
+# RosaSeed-Compact (1-step):
+#   make arch=native CXX=g++ ROSASEED=1 ROSASEED_1STEP=1
+#
 # Extra flags:
 #   CPPFLAGS_EXTRA="-DSA_COMPRESSION_FACTOR_POWER=2"
 #   CPPFLAGS_EXTRA="-DSA_COMPRESSION_FACTOR_POWER=2 -DENABLE_PHASE_II"
@@ -71,19 +74,35 @@ LIBS=		-lpthread -lm -lz -L. -lbwa -Lext/safestringlib -lsafestring $(STATIC_GCC
 
 ifdef ROSASEED
 	CPPFLAGS += -DROSASEED_INPROCESS
-	ROSA_INC = -Isrc/rosaseed
-	ROSA_OBJS = \
-		src/rosaseed_inprocess.o \
-		src/rosaseed_core_bridge.o \
-		src/rosaseed/read_init.o \
-		src/rosaseed/mem_alloc.o \
-		src/rosaseed/load_data_mmap.o \
-		src/rosaseed/helper_functions.o \
-		src/rosaseed/profiling.o \
-		src/rosaseed/bwa.o \
-		src/rosaseed/rosaseed_phaseA.o \
-		src/rosaseed/rosaseed_gapfill_PhaseC.o \
-		src/rosaseed/rosaseed_phaseB.o
+	ifdef ROSASEED_1STEP
+		CPPFLAGS += -DROSASEED_1STEP
+		ROSA_INC = -Isrc/rosaseed_compact
+		ROSA_OBJS = \
+			src/rosaseed_inprocess_compact.o \
+			src/rosaseed_core_bridge_compact.o \
+			src/rosaseed_compact/mem_alloc_compact.o \
+			src/rosaseed_compact/load_data_compact_mmap.o \
+			src/rosaseed_compact/helper_functions.o \
+			src/rosaseed_compact/profiling.o \
+			src/rosaseed_compact/bwa.o \
+			src/rosaseed_compact/rosaseed_compact_phaseA.o \
+			src/rosaseed_compact/rosaseed_compact_gapfill_PhaseC.o \
+			src/rosaseed_compact/rosaseed_compact_phaseB.o
+	else
+		ROSA_INC = -Isrc/rosaseed
+		ROSA_OBJS = \
+			src/rosaseed_inprocess.o \
+			src/rosaseed_core_bridge.o \
+			src/rosaseed/read_init.o \
+			src/rosaseed/mem_alloc.o \
+			src/rosaseed/load_data_mmap.o \
+			src/rosaseed/helper_functions.o \
+			src/rosaseed/profiling.o \
+			src/rosaseed/bwa.o \
+			src/rosaseed/rosaseed_phaseA.o \
+			src/rosaseed/rosaseed_gapfill_PhaseC.o \
+			src/rosaseed/rosaseed_phaseB.o
+	endif
 else
 	ROSA_INC =
 	ROSA_OBJS =
@@ -150,16 +169,16 @@ CXXFLAGS+=	-g -O3 -fpermissive $(ARCH_FLAGS)
 all: $(EXE)
 
 multi:
-	rm -f src/*.o src/rosaseed/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
-	$(MAKE) arch=sse41 EXE=bwa-mem2.sse41 CXX=$(CXX) ROSASEED=$(ROSASEED) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
-	rm -f src/*.o src/rosaseed/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
-	$(MAKE) arch=sse42 EXE=bwa-mem2.sse42 CXX=$(CXX) ROSASEED=$(ROSASEED) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
-	rm -f src/*.o src/rosaseed/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
-	$(MAKE) arch=avx EXE=bwa-mem2.avx CXX=$(CXX) ROSASEED=$(ROSASEED) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
-	rm -f src/*.o src/rosaseed/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
-	$(MAKE) arch=avx2 EXE=bwa-mem2.avx2 CXX=$(CXX) ROSASEED=$(ROSASEED) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
-	rm -f src/*.o src/rosaseed/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
-	$(MAKE) arch=avx512 EXE=bwa-mem2.avx512bw CXX=$(CXX) ROSASEED=$(ROSASEED) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
+	rm -f src/*.o src/rosaseed/*.o src/rosaseed_compact/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
+	$(MAKE) arch=sse41 EXE=bwa-mem2.sse41 CXX=$(CXX) ROSASEED=$(ROSASEED) ROSASEED_1STEP=$(ROSASEED_1STEP) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
+	rm -f src/*.o src/rosaseed/*.o src/rosaseed_compact/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
+	$(MAKE) arch=sse42 EXE=bwa-mem2.sse42 CXX=$(CXX) ROSASEED=$(ROSASEED) ROSASEED_1STEP=$(ROSASEED_1STEP) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
+	rm -f src/*.o src/rosaseed/*.o src/rosaseed_compact/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
+	$(MAKE) arch=avx EXE=bwa-mem2.avx CXX=$(CXX) ROSASEED=$(ROSASEED) ROSASEED_1STEP=$(ROSASEED_1STEP) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
+	rm -f src/*.o src/rosaseed/*.o src/rosaseed_compact/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
+	$(MAKE) arch=avx2 EXE=bwa-mem2.avx2 CXX=$(CXX) ROSASEED=$(ROSASEED) ROSASEED_1STEP=$(ROSASEED_1STEP) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
+	rm -f src/*.o src/rosaseed/*.o src/rosaseed_compact/*.o  $(BWA_LIB); cd ext/safestringlib/ && $(MAKE) clean;
+	$(MAKE) arch=avx512 EXE=bwa-mem2.avx512bw CXX=$(CXX) ROSASEED=$(ROSASEED) ROSASEED_1STEP=$(ROSASEED_1STEP) CPPFLAGS_EXTRA="$(CPPFLAGS_EXTRA)" all
 	$(CXX) -Wall -O3 src/runsimd.cpp -Iext/safestringlib/include -Lext/safestringlib/ -lsafestring $(STATIC_GCC) -o bwa-mem2
 
 $(EXE): $(BWA_LIB) $(SAFE_STR_LIB) src/main.o
@@ -172,7 +191,7 @@ $(SAFE_STR_LIB):
 	cd ext/safestringlib/ && $(MAKE) clean && $(MAKE) CC=$(CC) directories libsafestring.a
 
 clean:
-	rm -fr src/*.o src/rosaseed/*.o $(BWA_LIB) $(EXE) \
+	rm -fr src/*.o src/rosaseed/*.o src/rosaseed_compact/*.o $(BWA_LIB) $(EXE) \
 		bwa-mem2.sse41 bwa-mem2.sse42 bwa-mem2.avx bwa-mem2.avx2 bwa-mem2.avx512bw
 	cd ext/safestringlib/ && $(MAKE) clean
 

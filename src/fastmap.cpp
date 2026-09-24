@@ -42,7 +42,11 @@ Authors: Gandhi Shyama <smgandhi@ualberta.ca> [RosaSeed code addition]
 #include "FMI_search.h"
 
 #ifdef ROSASEED_INPROCESS
-    #include "rosaseed_core_bridge.h"
+    #ifdef ROSASEED_1STEP
+        #include "rosaseed_core_bridge_compact.h"
+    #else
+        #include "rosaseed_core_bridge.h"
+    #endif
     #include "rosaseed_inprocess.h"
 #endif
 
