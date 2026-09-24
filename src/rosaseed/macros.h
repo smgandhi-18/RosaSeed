@@ -39,7 +39,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 
 /********************************************************************************
  * Runtime-configurable equivalents (set from argv; g_min_seed_len_BC is always
- * g_min_seed_len_A + 1 — one user-facing parameter, the other is derived).
+ * g_min_seed_len_A + 1, one user-facing parameter, the other is derived).
  * Runtime-configurable Phase B/C specificity threshold and Phase A interval cap.
  * Both set from argv
  ********************************************************************************/
@@ -103,7 +103,7 @@ typedef struct smem_struct
 #define MAX_PATTERN_SIZE 250
 
 /**********************************************************
- * JUMP TABLE SIZE — auto-derived from LOAD_JTABLE_Xnt flag
+ * JUMP TABLE SIZE, auto-derived from LOAD_JTABLE_Xnt flag
  * Set via compiler -D flag: -DLOAD_JTABLE_14nt / _15nt / _16nt
  **********************************************************/
 
@@ -112,7 +112,7 @@ typedef struct smem_struct
 #elif defined(LOAD_JTABLE_16nt)
     #define JT_LEN_NT       16
 #else
-    #define JT_LEN_NT       14   // default — also covers fallback in file_dec_new.h
+    #define JT_LEN_NT       14   // default, also covers fallback in file_dec_new.h
 #endif
 
 #define KMER_BASES      JT_LEN_NT

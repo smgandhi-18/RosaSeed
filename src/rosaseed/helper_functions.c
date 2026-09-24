@@ -41,7 +41,7 @@ uint64_t increment_sa_compute = 0;
 #define TWO_STEP_TOTAL_LEN (2ULL * rosaseed_L)
 
 /* SA / BWT row space: [0, N).  SA values wrap modulo N.
-   NOTE: this is NOT 2*rosaseed_L — for 2-step, 2L == N+1, and for
+   NOTE: this is NOT 2*rosaseed_L: for 2-step, 2L == N+1, and for
    1-step, 2L == N-1. */
 #define BWT_ROW_SPACE    (BWT_SIZE_REFERENCE_SIZE)
 

@@ -22,32 +22,42 @@ variant analysis tools.
 
 ```
 RosaSeed/
-├── preprocessing/           FASTQ preprocessing scripts
-├── evaluation/              Accuracy evaluation scripts
-│   ├── evaluate_alignments.py
-│   └── README.md
 ├── src/
-│   ├── rosaseed/            RosaSeed seeding algorithm
-│   │   ├── rosaseed_phaseA.c
-│   │   ├── rosaseed_phaseB.c
-│   │   ├── rosaseed_gapfill_PhaseC.c
-│   │   ├── rosaseed_core_bridge.cpp
-│   │   ├── load_data_mmap.c
-│   │   ├── mem_alloc.c
-│   │   ├── helper_functions.c
-│   │   ├── bwa.c
-│   │   ├── file_dec.h
-│   │   ├── macros.h
-│   │   └── ...
-│   └── [bwa-mem2 source files]
-├── index-builder/           RosaSeed FM-index build pipeline
-│   ├── build_2step_pipeline.sh
-│   ├── rss_monitor.py
-│   ├── src/
+│   ├── rosaseed/                   RosaSeed (2-step) seeding kernel
+│   │   ├── rosaseed_phaseA.c       Phase A: jump table + backward search
+│   │   ├── rosaseed_phaseB.c       Phase B: fixed-pivot supplementary seeding
+│   │   ├── rosaseed_gapfill_PhaseC.c  Phase C: gap-directed seeding
+│   │   ├── load_data_mmap.c        index loading (mmap)
+│   │   ├── mem_alloc.c, helper_functions.c, bwa.c
+│   │   └── file_dec.h, macros.h, ...
+│   ├── rosaseed_compact/           RosaSeed-Compact (1-step) seeding kernel
+│   │   ├── rosaseed_compact_phaseA.c
+│   │   ├── rosaseed_compact_phaseB.c
+│   │   ├── rosaseed_compact_gapfill_PhaseC.c
+│   │   ├── load_data_compact_mmap.c, mem_alloc_compact.c
+│   │   └── file_dec.h, macros.h, ...
+│   ├── rosaseed_core_bridge.cpp    2-step kernel to BWA-MEM2 bridge
+│   ├── rosaseed_core_bridge_compact.cpp   compact kernel bridge
+│   ├── rosaseed_inprocess.cpp      seeding entry point used by bwamem.cpp
+│   ├── rosaseed_inprocess_compact.cpp
+│   └── [bwa-mem2 source files]     chaining, extension, SAM output
+├── index-builder/                  FM-index build pipelines
+│   ├── build_2step_pipeline.sh     2-step (base-16) index
+│   ├── build_compact_pipeline.sh   compact (radix-4) index
+│   ├── rss_monitor.py              RAM tracker used by the pipelines
+│   ├── src/                        index-builder tools (C)
 │   └── README.md
+├── evaluation/                     alignment accuracy evaluation
+│   ├── evaluate_alignments.py
+│   └── readme.md
+├── preprocessing/                  optional FASTQ preprocessing scripts
+├── test/                           inherited BWA-MEM2 unit tests
+├── ext/safestringlib/              inherited BWA-MEM2 dependency
+├── images/
 ├── Makefile
 ├── LICENSE
-└── README.md
+├── NEWS.md
+├── README.md
 └── README-bwamem2.md
 ```
 
@@ -159,6 +169,40 @@ Build time: ~44 minutes, peak RAM ~56 GB.
 
 ---
 
+### 6. Evaluate accuracy (optional)
+
+`evaluation/evaluate_alignments.py` compares an alignment against a reference
+alignment (for real reads, typically BWA-MEM2) or against simulator truth, and
+reports standard, structural and sequence-consistent accuracy plus the unmapped
+fraction.
+
+```bash
+python3 evaluation/evaluate_alignments.py reference.bam test.bam --stream
+```
+
+| Option | Meaning |
+|---|---|
+| `--stream` | both files are in the same read order (the usual case: aligner output follows the FASTQ). Constant memory, required for 100M+ read sets; without it both files are loaded into RAM |
+| `--tol50=N` | positional tolerance for standard accuracy (default 50 bp) |
+| `--ignore-refname` | compare positions without requiring the same reference name |
+| `--dump --outdir=DIR` | write the diagnostic false-negative / false-positive read lists and records (off by default) |
+
+Both SAM and BAM inputs are accepted. Only primary alignments are considered;
+secondary and supplementary records are skipped.
+
+---
+
+## Read handling
+
+| Input property | Behaviour |
+|---|---|
+| Ambiguous bases (`N`) in reads | Supported. Seed extension stops at an `N` and resumes past it, the same way the BWA-MEM2 SMEM search does. No preprocessing is required; the scripts in `preprocessing/` are optional. |
+| Variable read lengths in one FASTQ | Supported. Reads do not need to be trimmed to a uniform length. |
+| Maximum read length | RosaSeed (2-step): no fixed limit. RosaSeed-Compact: 251 bp, override at compile time with `-DRS_BATCH_MAX_READ_LEN=<n>`. |
+| Non-ACGT bases in the *reference* | Replaced with `A` by the index builder (`preprocess_genome`), preserving genome coordinates. |
+
+---
+
 ## Index summary
 
 RosaSeed requires two separate indexes:
@@ -167,8 +211,62 @@ RosaSeed requires two separate indexes:
 |---|---|---|---|
 | BWA-MEM2 index | `./bwa-mem2 index genome.fna` | Same directory as FASTA | ~6.9 GB |
 | RosaSeed index | `index-builder/build_2step_pipeline.sh` | `index-builder/index/<name>/` | ~42.7 GB |
+| RosaSeed-Compact index | `index-builder/build_compact_pipeline.sh` | `index-builder/index/<name>_compact/` | see [RosaSeed-Compact](#rosaseed-compact) |
 
 **Combined peak memory at alignment time: ~49.61 GB**
+
+---
+
+## RosaSeed-Compact
+
+RosaSeed-Compact pairs conventional 1-base (radix-4) FM-index traversal with
+8x suffix-array compression. It is intended for machines where memory is the
+main constraint: in the preprint benchmark it needs 25.86 GB peak (about 48%
+less than RosaSeed) at 44.34 µs/read, with 98.61% standard accuracy.
+
+It is selected at build time and uses its own index. The compact index builder
+takes any genome FASTA as downloaded, like the 2-step one (non-ACGT bases are
+replaced with A), and builds every file needed for any jump-table size and SA
+compression factor:
+
+```bash
+make clean
+make arch=native CXX=g++ ROSASEED=1 ROSASEED_1STEP=1 \
+  CPPFLAGS_EXTRA=" \
+    -DLOAD_JTABLE_15nt \
+    -DENABLE_F_RC_CHOICE \
+    -DSA_COMPRESSION_FACTOR_POWER=3 \
+    -DGAPFILL_EARLY_EXIT \
+    -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
+    -DROSASEED_PRECHAIN_TRIGGER=200 \
+    -DROSASEED_PRECHAIN_WEAK_LEN=60 \
+    -DROSASEED_PRECHAIN_USE_ABUNDANCE \
+    -DROSASEED_PRECHAIN_ABUNDANCE=500"
+
+cd index-builder && ./build_compact_pipeline.sh /path/to/genome.fna && cd ..
+
+./bwa-mem2 mem -t 20 -k 19 --rs-index index-builder/index/<genome_name>_compact/ \
+    --rs-cap 5000 /path/to/genome.fna reads.fastq.gz > output.sam
+```
+
+This is the recommended RosaSeed-Compact configuration: a 15-nt jump table, 8x SA
+compression (`-DSA_COMPRESSION_FACTOR_POWER=3`), gap fill with early exit but
+without `-DGAPFILL_ALWAYS_RUN_BOTH_STRANDS`, the abundance-aware pre-chain
+filter (SSF+A, threshold 500) and a Phase A interval cap of 5000.
+RosaSeed-Compact and RosaSeed are different seeders, so their SAM output is not
+expected to be identical.
+
+The BWA-MEM2 index (Step 3 of Quick start) is still required. The jump-table
+flag must match a table built with `-j`, and `-DSA_COMPRESSION_FACTOR_POWER`
+selects which `sa_*_cf*.bin` pair is loaded, as for RosaSeed. The runtime
+flags (`--rs-*`, `-k`, `-t`) are the same as for RosaSeed. RosaSeed-Compact accepts reads up to 251 bp
+(override at compile time with `-DRS_BATCH_MAX_READ_LEN=<n>`), and has the
+same 2^32 bp genome limit as RosaSeed.
+
+> **Note:** `make clean` is required before switching between RosaSeed
+> (2-step) and RosaSeed-Compact builds: object files are not rebuilt just
+> because the flags changed. Also, `ROSASEED_1STEP=1` only takes effect when
+> passed together with `ROSASEED=1`; on its own it selects nothing.
 
 ---
 
@@ -314,8 +412,8 @@ without recompilation.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--rs-index <dir>` | *(required)* | Path to the RosaSeed index directory produced by `build_2step_pipeline.sh`. Must contain `cp_occ_full.bin`, `c_vector.txt`, `ref16_packed.bin`, the SA split files, and the jump table. |
-| `--rs-cap <int>` | 2000 | Phase A SA interval cap. Seeds whose BWT interval width exceeds this value are skipped in Phase A (too repetitive to be useful). Lower values run faster but may miss seeds in repetitive regions. Recommended: 2000 for standard use, 50 for miniRosaSeed. |
+| `--rs-index <dir>` | *(required)* | Path to the RosaSeed index directory produced by `build_2step_pipeline.sh`. Must contain `cp_occ_full.bin`, `c_vector.txt`, `ref16_packed.bin`, the SA split files, and the jump table. A RosaSeed-Compact build (`ROSASEED_1STEP=1`) instead expects a directory produced by `build_compact_pipeline.sh`, containing `cp_occ_compact.bin`, `ref4_packed.bin`, the SA split files, and the jump table. See [RosaSeed-Compact](#rosaseed-compact). |
+| `--rs-cap <int>` | 2000 | Phase A SA interval cap. Seeds whose BWT interval width exceeds this value are skipped in Phase A (too repetitive to be useful). Lower values run faster but may miss seeds in repetitive regions. Recommended: 2000 for standard use, 200 for miniRosaSeed. |
 
 #### Inherited BWA-MEM2 runtime flags (relevant to RosaSeed)
 
@@ -368,9 +466,10 @@ make arch=native CXX=g++ ROSASEED=1 \
 
 ### miniRosaSeed
 
-Reduced-aggressiveness configuration benchmarked against minibwa.
-Achieves 2.08× end-to-end speedup over minibwa at single thread
-with 2.581 percentage points higher standard accuracy.
+Speed-optimised configuration, benchmarked against minibwa. A loose interval
+cap combined with an aggressive pre-chain singleton filter: the cap lets enough
+seeds through for accuracy, and the filter removes the repetitive singletons
+that would otherwise cost chaining and extension time.
 
 ```bash
 make arch=native CXX=g++ ROSASEED=1 \
@@ -381,12 +480,29 @@ make arch=native CXX=g++ ROSASEED=1 \
     -DGAPFILL_ALWAYS_RUN_BOTH_STRANDS \
     -DGAPFILL_EARLY_EXIT \
     -DROSASEED_PRECHAIN_SINGLETON_SUPPRESS \
-    -DROSASEED_PRECHAIN_TRIGGER=50 \
-    -DROSASEED_PRECHAIN_WEAK_LEN=60"
+    -DROSASEED_PRECHAIN_TRIGGER=25 \
+    -DROSASEED_PRECHAIN_WEAK_LEN=80"
 
 ./bwa-mem2 mem -t 1 -k 19 --rs-index index-builder/index/<name>/ \
-    --rs-cap 50 genome.fna reads.fastq.gz > output.sam
+    --rs-cap 200 genome.fna reads.fastq.gz > output.sam
 ```
+
+This configuration replaces the earlier one (`--rs-cap 50`,
+`-DROSASEED_PRECHAIN_TRIGGER=50`, `-DROSASEED_PRECHAIN_WEAK_LEN=60`) used in the
+preprint. On the 20M-read ERR dataset, single-threaded, it is 2.8% faster
+(12.96 vs 13.33 µs/read, mean of 3 runs) while reaching 97.345% standard
+accuracy instead of 96.947% and leaving 1.62% of reads unmapped instead of
+2.09%. `--rs-cap 100` with the same filter settings is marginally faster again
+(12.79 µs/read) at 97.057% accuracy. Neither configuration uses the
+abundance-aware filter.
+
+### Compact
+
+Lowest memory (25.86 GB peak in the preprint benchmark): 15-nt jump table,
+`-DSA_COMPRESSION_FACTOR_POWER=3`, SSF+A (`-DROSASEED_PRECHAIN_USE_ABUNDANCE`,
+`-DROSASEED_PRECHAIN_ABUNDANCE=500`), gap fill with `-DGAPFILL_EARLY_EXIT` only
+(no `-DGAPFILL_ALWAYS_RUN_BOTH_STRANDS`) and `--rs-cap 5000`. Full build and run
+commands are in [RosaSeed-Compact](#rosaseed-compact).
 
 ---
 ## Key results
@@ -407,11 +523,14 @@ This comprises the RosaSeed 2-step FM-index (~42.7 GB) and the BWA-MEM2
 index files (~6.9 GB) required by the downstream chaining and alignment
 extension pipeline.
 
-On a separate AMD Zen3 workstation, the reduced-aggressiveness
+On a separate AMD Zen3 workstation, the speed-optimised
 **miniRosaSeed** configuration achieves a **2.08× end-to-end speedup**
 over minibwa at single-thread execution while attaining
 **2.581 percentage points higher standard accuracy**, remaining faster
-and more accurate simultaneously up to ~26 threads.
+and more accurate simultaneously up to ~26 threads. Those figures are from
+the preprint, measured with the earlier miniRosaSeed settings; the
+configuration shipped here (see [miniRosaSeed](#minirosaseed)) is faster and
+more accurate than those settings on the ERR dataset, so both margins widen.
 
 RosaSeed exposes multiple runtime-memory operating configurations
 spanning memory-efficient and high-performance designs, enabling users

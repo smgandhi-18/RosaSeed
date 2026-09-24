@@ -365,7 +365,7 @@ void load_bwt_data_structures(void)
 
     const size_t sa_n = (size_t)SA_SAMPLED_SIZE;
 
-    /* Set up mmap tasks: one per large file */
+    /* Set up mmap tasks */
     MmapTask task_sa_ls = {
         .path       = SA_LS_WORD_BIN_FILE,
         .skip_bytes = 0,
