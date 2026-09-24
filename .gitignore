@@ -19,11 +19,15 @@ index-builder/convert_sa_to_bin_CF
 index-builder/make_cp_occ_2step
 index-builder/make_ref16_packed
 index-builder/make_jumptable_2step
- 
+index-builder/derive_compactref
+index-builder/make_cp_occ_compact
+index-builder/make_ref4_packed_compact
+index-builder/make_jumptable_compact
+
 # Index builder: auto-downloaded gsufsort
 index-builder/tools/gsufsort/
  
-# Index output files (too large for git — user generates locally)
+# Index output files (too large for git, user generates locally)
 index-builder/index/
  
 # OS junk

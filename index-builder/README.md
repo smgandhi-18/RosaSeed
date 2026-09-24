@@ -119,6 +119,32 @@ Options:
 > higher than the reported value, use your system resource monitor for
 > independent confirmation.
 
+## RosaSeed-Compact index
+
+```bash
+./build_compact_pipeline.sh [-o dir] [-g gsufsort-64] [-j 14|15|16|all|14,15|14,16|15,16] [-k] genome.fa
+```
+
+Same stages as the 2-step pipeline, but the indexed text is the forward genome
+followed by its reverse complement (1-base alphabet A/C/G/T) instead of the
+base-16 2-step reference. Default output: `./index/<genome_basename>_compact/`
+(kept separate from the 2-step index because the SA and jump-table filenames
+are shared). Accepts any FASTA; N and IUPAC codes become A. All four SA
+compression-factor files are always built; jump tables default to 14 + 15-mer,
+as for 2-step.
+
+| File | Description |
+|---|---|
+| `cp_occ_compact.bin` | 88-byte header (magic `RS1OCC32`, C-vector, sentinel) + 32-byte OCC blocks |
+| `ref4_packed.bin` | Forward + reverse-complement reference, 2 bits per base |
+| `sa_ls_word_cf{1,2,4,8}.bin`, `sa_ms_byte_cf{1,2,4,8}.bin` | Compressed SA (same format as 2-step) |
+| `jumptable_{14,15,16}nt.bin` | 4^k × 8-byte jump-table entries |
+
+Build the aligner with `ROSASEED=1 ROSASEED_1STEP=1` to use this index.
+Resource use for a human genome has not yet been re-measured with this script;
+the original 1-step pipeline estimated about 37 GB RAM for jump-table
+generation, and gsufsort runs on a text of the same length as the 2-step one.
+
 ## Pipeline steps
 
 ```
