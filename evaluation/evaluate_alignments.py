@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
+import os
 import pysam
 import sys
 
 def compute_nm_from_cigar(read):
-    """Approximate NM tag from CIGAR if NM tag missing."""
+    """Edit distance from CIGAR: I + D + X.
+
+    Exact for CIGARs that use =/X (e.g. simulator truth). For CIGARs that use M
+    (BWA-MEM2, RosaSeed and most aligners) matches and mismatches are merged, so
+    X never appears and this undercounts by the number of mismatches; the NM tag
+    is used in preference wherever it is present."""
     if read is None or read.cigartuples is None:
         return None
     nm = 0
@@ -14,14 +20,16 @@ def compute_nm_from_cigar(read):
 
 
 def edit_burden(read):
-    """Total burden: I + D + X (structural edit burden)."""
+    """Structural edit burden E(r) = I + D + X.
+
+    That quantity is exactly what the NM tag records (mismatched + inserted +
+    deleted bases), so NM is used when present and the CIGAR is the fallback."""
     if read is None or read.cigartuples is None:
         return None
-    burden = 0
-    for op, length in read.cigartuples:
-        if op in (1, 2, 8):
-            burden += length
-    return burden
+    try:
+        return read.get_tag("NM")
+    except KeyError:
+        return compute_nm_from_cigar(read)
 
 
 def relaxed_structural_correct(t_read, a_read, tolerance=0.05):
@@ -68,7 +76,8 @@ def open_alignment(filename):
 # Main Evaluation
 # ----------------------------------------------------------------------
 
-def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refname=False):
+def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refname=False,
+             stream=False, outdir=".", dump=False):
     """
     reference_sam: proxy gold/reference aligner SAM (e.g. BWA-MEM2)
     test_sam: aligner under evaluation (e.g. Rosaseed)
@@ -77,20 +86,34 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
     truth = open_alignment(reference_sam)
     align = open_alignment(test_sam)
 
-    # Key must stay (QNAME, mate): paired mates share a QNAME, so keying on the
-    # name alone drops one mate per pair and can compare truth R2 against test R1.
-    truth_dict = {
-        (r.query_name, r.is_read1): r
-        for r in truth.fetch(until_eof=True)
-        if (not r.is_secondary) and (not r.is_supplementary)
-    }
-    align_dict = {
-        (r.query_name, r.is_read1): r
-        for r in align.fetch(until_eof=True)
-        if (not r.is_secondary) and (not r.is_supplementary)
-    }
+    def primary_records(af):
+        for r in af.fetch(until_eof=True):
+            if (not r.is_secondary) and (not r.is_supplementary):
+                yield r
 
-    all_keys = set(truth_dict.keys()) | set(align_dict.keys())
+    if stream:
+        # Both files in the same read order (the usual case: aligner output
+        # follows the FASTQ). Constant memory, so 100M+ read sets are feasible.
+        def pairs():
+            import itertools
+            for t, a in itertools.zip_longest(primary_records(truth), primary_records(align)):
+                if t is None or a is None:
+                    sys.exit("--stream: the two files hold different numbers of primary "
+                             "records; rerun without --stream")
+                if (t.query_name, t.is_read1) != (a.query_name, a.is_read1):
+                    sys.exit(f"--stream: record order differs ({t.query_name} vs "
+                             f"{a.query_name}); rerun without --stream")
+                yield t, a
+    else:
+        # Key must stay (QNAME, mate): paired mates share a QNAME, so keying on
+        # the name alone drops one mate per pair and can compare truth R2
+        # against test R1.
+        truth_dict = {(r.query_name, r.is_read1): r for r in primary_records(truth)}
+        align_dict = {(r.query_name, r.is_read1): r for r in primary_records(align)}
+        all_keys = set(truth_dict.keys()) | set(align_dict.keys())
+        def pairs():
+            for key in all_keys:
+                yield truth_dict.get(key), align_dict.get(key)
 
     # Strict (±5 bp)
     TP = FP = FN = TN = 0
@@ -126,10 +149,8 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
     standard_fp_ids = []
     strict_fp_ids = []
 
-    for key in all_keys:
-        qname = key[0]
-        t_read = truth_dict.get(key)   # BWA-MEM2 in your current usage
-        a_read = align_dict.get(key)   # Rosaseed in your current usage
+    for t_read, a_read in pairs():     # reference record, test record
+        qname = (t_read or a_read).query_name
         total += 1
 
         # Label used in the dumped read-ID lists: name/1, name/2 when paired,
@@ -156,24 +177,25 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
         elif (not t_missing_or_unmapped) and a_missing_or_unmapped:
             FN += 1
             FN50 += 1
-            if a_read is not None and a_read.is_unmapped:
-                FN_align_recs.append(a_read)
-            if t_read is not None:
-                FN_truth_recs.append(t_read)
+            if dump:
+                if a_read is not None and a_read.is_unmapped:
+                    FN_align_recs.append(a_read)
+                if t_read is not None:
+                    FN_truth_recs.append(t_read)
             continue
 
         # Case 3: reference missing/unmapped, Rosaseed mapped
         elif t_missing_or_unmapped and (not a_missing_or_unmapped):
             FP += 1
             FP50 += 1
-            strict_fp_ids.append(read_id)
-            standard_fp_ids.append(read_id)
-
-            test_only_mapped_ids.append(read_id)
-            if t_read is not None:
-                test_only_truth_recs.append(t_read)
-            if a_read is not None:
-                test_only_align_recs.append(a_read)
+            if dump:
+                strict_fp_ids.append(read_id)
+                standard_fp_ids.append(read_id)
+                test_only_mapped_ids.append(read_id)
+                if t_read is not None:
+                    test_only_truth_recs.append(t_read)
+                if a_read is not None:
+                    test_only_align_recs.append(a_read)
 
             # SCC (mapped alignments only)
             if (a_read is not None) and (not a_read.is_unmapped):
@@ -200,13 +222,15 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
                 TP += 1
             else:
                 FP += 1
-                strict_fp_ids.append(read_id)
+                if dump:
+                    strict_fp_ids.append(read_id)
 
             if same_ref and same_strand and (pos_diff <= tol_standard):
                 TP50 += 1
             else:
                 FP50 += 1
-                standard_fp_ids.append(read_id)
+                if dump:
+                    standard_fp_ids.append(read_id)
 
         # Structural accuracy (mapped alignments only)
         if (a_read is not None) and (not a_read.is_unmapped) and (t_read is not None):
@@ -279,12 +303,12 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
         print("SCA accuracy: N/A")
 
     if FN_truth_recs:
-        with pysam.AlignmentFile("FN_truth_records.sam", "w", header=truth.header) as out1:
+        with pysam.AlignmentFile(os.path.join(outdir, "FN_truth_records.sam"), "w", header=truth.header) as out1:
             for r in FN_truth_recs:
                 out1.write(r)
 
         if FN_align_recs:
-            with pysam.AlignmentFile("FN_align_records.sam", "w", header=align.header) as out2:
+            with pysam.AlignmentFile(os.path.join(outdir, "FN_align_records.sam"), "w", header=align.header) as out2:
                 for r in FN_align_recs:
                     out2.write(r)
 
@@ -293,16 +317,16 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
             print(f"Wrote {len(FN_align_recs)} FN align/test records (unmapped cases only).")
 
     if test_only_mapped_ids:
-        with open("test_only_mapped_read_ids.txt", "w") as f:
+        with open(os.path.join(outdir, "test_only_mapped_read_ids.txt"), "w") as f:
             for rid in test_only_mapped_ids:
                 f.write(rid + "\n")
 
         if test_only_truth_recs:
-            with pysam.AlignmentFile("test_only_reference_records.sam", "w", header=truth.header) as out1:
+            with pysam.AlignmentFile(os.path.join(outdir, "test_only_reference_records.sam"), "w", header=truth.header) as out1:
                 for r in test_only_truth_recs:
                     out1.write(r)
 
-        with pysam.AlignmentFile("test_only_align_records.sam", "w", header=align.header) as out2:
+        with pysam.AlignmentFile(os.path.join(outdir, "test_only_align_records.sam"), "w", header=align.header) as out2:
             for r in test_only_align_recs:
                 out2.write(r)
 
@@ -313,13 +337,13 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
         print("Wrote test_only_align_records.sam")
 
     if standard_fp_ids:
-        with open("standard_fp_all_read_ids.txt", "w") as f:
+        with open(os.path.join(outdir, "standard_fp_all_read_ids.txt"), "w") as f:
             for rid in standard_fp_ids:
                 f.write(rid + "\n")
         print(f"Wrote {len(standard_fp_ids)} standard FP read IDs to standard_fp_all_read_ids.txt")
 
     if strict_fp_ids:
-        with open("strict_fp_all_read_ids.txt", "w") as f:
+        with open(os.path.join(outdir, "strict_fp_all_read_ids.txt"), "w") as f:
             for rid in strict_fp_ids:
                 f.write(rid + "\n")
         print(f"Wrote {len(strict_fp_ids)} strict FP read IDs to strict_fp_all_read_ids.txt")
@@ -339,7 +363,13 @@ def evaluate(reference_sam, test_sam, tol_strict=5, tol_standard=50, ignore_refn
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("Usage:")
-        print("  python evaluate_alignments.py reference.sam test.sam [tol_strict] [--tol50=50] [--ignore-refname]")
+        print("  python evaluate_alignments.py reference.sam test.sam [tol_strict] \\")
+        print("         [--tol50=50] [--ignore-refname] [--stream] [--outdir=DIR] [--dump]")
+        print()
+        print("  --stream   both files in the same read order: constant memory, needed")
+        print("             for 100M+ read sets (the default loads both into RAM)")
+        print("  --outdir   where the optional diagnostic side files are written")
+        print("  --dump     write the FN / FP / test-only diagnostic files (off by default)")
         sys.exit(1)
 
     reference_sam = sys.argv[1]
@@ -348,12 +378,21 @@ if __name__ == "__main__":
     tol_strict = 5
     tol_standard = 50
     ignore_refname = False
+    stream = False
+    outdir = "."
+    dump = False
 
     for arg in sys.argv[3:]:
         if arg.startswith("--tol50="):
             tol_standard = int(arg.split("=", 1)[1])
+        elif arg.startswith("--outdir="):
+            outdir = arg.split("=", 1)[1]
         elif arg == "--ignore-refname":
             ignore_refname = True
+        elif arg == "--stream":
+            stream = True
+        elif arg == "--dump":
+            dump = True
         elif arg.isdigit():
             tol_strict = int(arg)
 
@@ -362,5 +401,8 @@ if __name__ == "__main__":
         test_sam,
         tol_strict=tol_strict,
         tol_standard=tol_standard,
-        ignore_refname=ignore_refname
+        ignore_refname=ignore_refname,
+        stream=stream,
+        outdir=outdir,
+        dump=dump
     )
