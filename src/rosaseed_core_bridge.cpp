@@ -119,15 +119,22 @@ static char path_sa_bin[1024];
 static char path_msb_bin[1024];
 static char path_occ_bin[1024];
 
+/*
+ * rosaseed_to_b4(), read base to base-4 code.
+ * N-HANDLING: an ambiguous base becomes 4, a sentinel the seeding phases stop
+ * on; it is never silently read as 'A'. Matches the compact kernel and the
+ * SMEM search of stock BWA-MEM2.
+ */
 static inline uint8_t rosaseed_to_b4(unsigned char c)
 {
-    if (c <= 3) return c;
+    if (c <= 3) return c;   // BWA already encoded A/C/G/T as 0/1/2/3
+    if (c == 4) return 4;   // BWA's pre-encoded N (nst_nt4_table), sentinel
     switch (c) {
         case 'A': case 'a': return 0;
         case 'C': case 'c': return 1;
         case 'G': case 'g': return 2;
         case 'T': case 't': return 3;
-        default:            return 0;
+        default:            return 4;   // raw 'N' or garbage, sentinel
     }
 }
 
@@ -138,8 +145,10 @@ static void rosaseed_seq_to_b4_arrays(const char *seq,
 {
     for (int i = 0; i < read_len; ++i)
         fwd[i] = rosaseed_to_b4((unsigned char)seq[i]);
-    for (int i = 0; i < read_len; ++i)
-        rc[i] = fwd[read_len - 1 - i] ^ 0x3u;
+    for (int i = 0; i < read_len; ++i) {
+        uint8_t b = fwd[read_len - 1 - i];
+        rc[i] = (b == 4) ? 4 : (uint8_t)(b ^ 0x3u);   /* N stays N under RC */
+    }
 }
 
 static void rosaseed_core_ensure_thread_buffers(int64_t max_hits_for_call,

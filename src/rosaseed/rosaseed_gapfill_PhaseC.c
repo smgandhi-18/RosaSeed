@@ -43,6 +43,30 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 
 #define DEBUG_PRINTF_GAPFILLPHASE GF_PRINT
 
+
+/* N-HANDLING: an ambiguous read base (code 4) has no base-16 symbol, so any
+   k-mer window containing one has no jump-table address. */
+#define RS_JT_ADDR_INVALID UINT64_MAX
+
+/* Prefetch a jump entry only when the address is valid. */
+#define RS_PREFETCH_JUMP(addr_expr, rw, loc)                    \
+    do {                                                        \
+        uint64_t rs_pf_addr_ = (addr_expr);                     \
+        if (rs_pf_addr_ != RS_JT_ADDR_INVALID)                  \
+            __builtin_prefetch(&jump_pointers[rs_pf_addr_], (rw), (loc)); \
+    } while (0)
+
+static inline __attribute__((always_inline))
+int jump_addr_is_valid(uint64_t addr) { return addr != RS_JT_ADDR_INVALID; }
+
+/* Jump entry for a possibly invalid address. Entry 0 decodes to l == h == 0
+   (diff 0), which every caller already treats as "no hit". */
+static inline __attribute__((always_inline))
+uint64_t jump_entry_at(uint64_t addr)
+{
+    return jump_addr_is_valid(addr) ? jump_pointers[addr] : 0ULL;
+}
+
 static inline __attribute__((always_inline))
 uint64_t compute_jumpN_from_base4(const uint8_t *pat4,
                                    int seed_end_base,
@@ -51,9 +75,14 @@ uint64_t compute_jumpN_from_base4(const uint8_t *pat4,
     uint64_t addr = 0;
     int b = seed_end_base;
     for (int k = 0; k < jump_len_nt; ++k, --b)
-        addr |= ((uint64_t)pat4[b]) << (2 * k);
+    {
+        uint8_t nt = pat4[b];
+        if (nt >= 4) return RS_JT_ADDR_INVALID;   /* N-HANDLING: no symbol */
+        addr |= ((uint64_t)nt) << (2 * k);
+    }
     return addr;
 }
+
 
 
 static inline __attribute__((always_inline))
@@ -64,6 +93,9 @@ int fm_step2_b4(const uint8_t *pat4,
 {
     int i = *read_idx_base;
     if (i <= 0) return 0;
+
+    /* N-HANDLING: stop extension at an ambiguous base. */
+    if (pat4[i] >= 4 || pat4[i - 1] >= 4) return 0;
 
     base16_t sym = (base16_t)((pat4[i-1] << 2) | pat4[i]);
     uint64_t L2 = *l, H2 = *h;
@@ -188,7 +220,7 @@ int ref_walk_pairwise_back_b4(uint8_t *pat,
 
 /* ============================================================
    run_single_pivot()
-   pivot_base    : index into pat[] — chosen-strand coordinate
+   pivot_base    : index into pat[]: chosen-strand coordinate
    active_strand : 0=forward pat_f4, 1=RC pat_rc4
    ============================================================ */
 static inline __attribute__((always_inline))
@@ -207,7 +239,7 @@ int run_single_pivot(
     if (pivot_base + 1 < min_seed_bc) return 0;
 
     uint64_t addr = compute_jumpN_from_base4(pat, pivot_base, JT_LEN_NT);
-    uint64_t jp   = jump_pointers[addr];
+    uint64_t jp   = jump_entry_at(addr);
 
     uint64_t l, h, diff;
     extract_jump_bounds(jp, &l, &h, &diff);
@@ -562,7 +594,7 @@ static int run_gap_pivots(
                          : (read_len_bases - 1) - pivots_fwd[i];
         if (strand_pivot < min_pivot) continue;   /* leave inactive */
         uint64_t addr = compute_jumpN_from_base4(pat, strand_pivot, JT_LEN_NT);
-        __builtin_prefetch(&jump_pointers[addr], 0, 1);
+        RS_PREFETCH_JUMP(addr, 0, 1);
         slots[i].active = 1;   /* candidate: still needs PASS 2 validation */
     }
 
@@ -575,7 +607,7 @@ static int run_gap_pivots(
                          : (read_len_bases - 1) - pivots_fwd[i];
 
         uint64_t addr = compute_jumpN_from_base4(pat, strand_pivot, JT_LEN_NT);
-        uint64_t jp   = jump_pointers[addr];
+        uint64_t jp   = jump_entry_at(addr);
 
         uint64_t l, h, diff;
         extract_jump_bounds(jp, &l, &h, &diff);
@@ -772,13 +804,13 @@ static void process_gap(
     #endif
     
     if (!run_pass2) {
-        GF_PRINT(" —> gap COVERED, skipping PASS2\n");
+        GF_PRINT(" -> gap COVERED, skipping PASS2\n");
         return;
     }
     
     GF_PRINT(covered_after_p1
-             ? " —> gap COVERED, but PASS2 forced\n"
-             : " —> gap still OPEN\n");
+             ? " -> gap COVERED, but PASS2 forced\n"
+             : " -> gap still OPEN\n");
     
     GF_PRINT("    [PASS2 strand=%d]\n", opposite_strand);
     
@@ -796,7 +828,7 @@ static void process_gap(
 
 
 /* ============================================================
-   gap_fill_phase()  —  main entry point
+   gap_fill_phase(): main entry point
    ============================================================
    Processes each gap independently:
      - Left edge:     [0 .. first_seed.start - 1]

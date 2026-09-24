@@ -38,6 +38,30 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
 #include "helper_functions.h"
 #include "bwa.h"
 
+
+/* N-HANDLING: an ambiguous read base (code 4) has no base-16 symbol, so any
+   k-mer window containing one has no jump-table address. */
+#define RS_JT_ADDR_INVALID UINT64_MAX
+
+/* Prefetch a jump entry only when the address is valid. */
+#define RS_PREFETCH_JUMP(addr_expr, rw, loc)                    \
+    do {                                                        \
+        uint64_t rs_pf_addr_ = (addr_expr);                     \
+        if (rs_pf_addr_ != RS_JT_ADDR_INVALID)                  \
+            __builtin_prefetch(&jump_pointers[rs_pf_addr_], (rw), (loc)); \
+    } while (0)
+
+static inline __attribute__((always_inline))
+int jump_addr_is_valid(uint64_t addr) { return addr != RS_JT_ADDR_INVALID; }
+
+/* Jump entry for a possibly invalid address. Entry 0 decodes to l == h == 0
+   (diff 0), which every caller already treats as "no hit". */
+static inline __attribute__((always_inline))
+uint64_t jump_entry_at(uint64_t addr)
+{
+    return jump_addr_is_valid(addr) ? jump_pointers[addr] : 0ULL;
+}
+
 /* Build a k-mer jump-table address directly from base-4 read.
    seed_end_base is a base index (0..read_len_bases-1). */
    static inline __attribute__((always_inline))
@@ -50,6 +74,7 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
    
        for (int k = 0; k < jump_len_nt; ++k, --b) {
            uint8_t nt = pat4[b];
+           if (nt >= 4) return RS_JT_ADDR_INVALID;   /* N-HANDLING: no symbol */
            addr |= ((uint64_t)nt) << (2 * k);
        }
        return addr;
@@ -76,6 +101,10 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
    
        uint8_t right = pat4[i];
        uint8_t left  = pat4[i - 1];
+   
+       /* N-HANDLING: stop extension at an ambiguous base. */
+       if (right >= 4 || left >= 4)
+           return 0;
    
        base16_t sym = (base16_t)((left << 2) | right);   
    
@@ -112,6 +141,10 @@ Contacts: Shyama Gandhi <smgandhi@ualberta.ca>
    {
        uint8_t right = pat4[fail_idx];   // RIGHT base stays same
        uint8_t original_left = pat4[fail_idx - 1];
+   
+       /* N-HANDLING: never substitute a base for an N. */
+       if (right >= 4 || original_left >= 4)
+           return 0;
    
        for (uint8_t left = 0; left < 4; left++) {
            if (left == original_left) continue;
@@ -267,6 +300,7 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
 
     return matched;
 }
+
    
    /* Decide next pivot in "base" coordinates.
       - seed_end_base: base index of rightmost base of seed
@@ -304,6 +338,10 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
                               int *seed_len_bases)
    {
        uint8_t right = pat4[0];   // leftover base acts as RIGHT half
+   
+       /* N-HANDLING: never substitute a base for an N. */
+       if (right >= 4)
+           return 0;
        uint64_t bestL = *l;
        uint64_t bestH = *h;
    
@@ -371,13 +409,12 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
         addr[i] = compute_jumpN_from_base4(shortread_pattern,
                                            seed_end_base,
                                            JT_LEN_NT);
-        __builtin_prefetch(&jump_pointers[addr[i]], 0, 1);
+        RS_PREFETCH_JUMP(addr[i], 0, 1);
     }
 
     /* ================================================================
        COROUTINE INTERLEAVER across the num_pivots Phase II pivots.
        ================================================================ */
-
     /*
        PASS 1 (jump_pointers prefetch) already done above.
        PASS 2: read warm jump entries, init slots, prefetch cp_occ.
@@ -424,7 +461,7 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
         if (pivot_base + 1 < min_seed_bc)  continue;
         if (addr[i] == UINT64_MAX)          continue;
 
-        uint64_t jp = jump_pointers[addr[i]];   /* warm from PASS 1 */
+        uint64_t jp = jump_entry_at(addr[i]);   /* warm from PASS 1 */
         uint64_t l, h, diff;
         extract_jump_bounds(jp, &l, &h, &diff);
         if (l >= h) continue;   /* leave valid=0 */

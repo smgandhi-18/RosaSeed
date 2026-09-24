@@ -41,6 +41,30 @@ __thread int short_read_len;
 
 extern uint64_t counter_readunique_after1stjump;
 
+
+/* N-HANDLING: an ambiguous read base (code 4) has no base-16 symbol, so any
+   k-mer window containing one has no jump-table address. */
+#define RS_JT_ADDR_INVALID UINT64_MAX
+
+/* Prefetch a jump entry only when the address is valid. */
+#define RS_PREFETCH_JUMP(addr_expr, rw, loc)                    \
+    do {                                                        \
+        uint64_t rs_pf_addr_ = (addr_expr);                     \
+        if (rs_pf_addr_ != RS_JT_ADDR_INVALID)                  \
+            __builtin_prefetch(&jump_pointers[rs_pf_addr_], (rw), (loc)); \
+    } while (0)
+
+static inline __attribute__((always_inline))
+int jump_addr_is_valid(uint64_t addr) { return addr != RS_JT_ADDR_INVALID; }
+
+/* Jump entry for a possibly invalid address. Entry 0 decodes to l == h == 0
+   (diff 0), which every caller already treats as "no hit". */
+static inline __attribute__((always_inline))
+uint64_t jump_entry_at(uint64_t addr)
+{
+    return jump_addr_is_valid(addr) ? jump_pointers[addr] : 0ULL;
+}
+
 /* Build a k-mer jump-table address directly from base-4 read.
    seed_end_base is a base index (0..read_len_bases-1). */
 static inline __attribute__((always_inline))
@@ -53,10 +77,12 @@ uint64_t compute_jumpN_from_base4(const uint8_t *pat4,
 
     for (int k = 0; k < jump_len_nt; ++k, --b) {
         uint8_t nt = pat4[b];
+        if (nt >= 4) return RS_JT_ADDR_INVALID;   /* N-HANDLING: no symbol */
         addr |= ((uint64_t)nt) << (2 * k);
     }
     return addr;
 }
+
 
 /* Universal 2-base FM backward step for base-4 read.
    - pat4 is read in base-4 (array of 0..3)
@@ -78,6 +104,10 @@ int fm_step2_b4(const uint8_t *pat4,
 
     uint8_t right = pat4[i];
     uint8_t left  = pat4[i - 1];
+
+    /* N-HANDLING: stop extension at an ambiguous base. */
+    if (right >= 4 || left >= 4)
+        return 0;
 
     base16_t sym = (base16_t)((left << 2) | right);  
 
@@ -114,6 +144,10 @@ int fm_rescue_left_b4(const uint8_t *pat4,
 {
     uint8_t right = pat4[fail_idx];   // RIGHT base stays same
     uint8_t original_left = pat4[fail_idx - 1];
+
+    /* N-HANDLING: never substitute a base for an N. */
+    if (right >= 4 || original_left >= 4)
+        return 0;
 
     for (uint8_t left = 0; left < 4; left++) {
         if (left == original_left) continue;
@@ -253,7 +287,8 @@ static inline __attribute__((always_inline)) int ref_walk_pairwise_back_b4(
 static inline __attribute__((always_inline))
 int next_pivot_after_seed_base(int seed_end_base,
                                int seed_len_bases,
-                               int emitted)
+                               int emitted,
+                               const uint8_t *pat4)
 {
     DEBUG_PRINTF("[next_pivot] seed_end_base=%d seed_len=%d emitted=%d\n",
                  seed_end_base, seed_len_bases, emitted);
@@ -264,6 +299,22 @@ int next_pivot_after_seed_base(int seed_end_base,
 
     int next_base = seed_end_base - backoff_bases - 1;
     if (next_base < 0) return -1;
+
+    /* N-HANDLING: the pivot must not sit on an N, and a pivot whose jump-table
+       window still covers an N can never produce a lookup, so skip directly to
+       the left of the rightmost N in that window instead of retrying each
+       position one base at a time. */
+    for (;;) {
+        if (next_base < 0) return -1;
+        if (pat4[next_base] >= 4) { --next_base; continue; }
+        int lo = next_base - (JT_LEN_NT - 1);
+        if (lo < 0) lo = 0;
+        int rightmost_n = -1;
+        for (int p = next_base - 1; p >= lo; --p)
+            if (pat4[p] >= 4) { rightmost_n = p; break; }
+        if (rightmost_n < 0) break;
+        next_base = rightmost_n - 1;
+    }
 
     DEBUG_PRINTF("[next_pivot] backoff=%d -> next_base=%d\n",
                  backoff_bases, next_base);
@@ -282,6 +333,10 @@ int fm_left_edge_rescue_b4(const uint8_t *pat4,
                            int *seed_len_bases)
 {
     uint8_t right = pat4[0];   // leftover base acts as RIGHT half
+
+    /* N-HANDLING: never substitute a base for an N. */
+    if (right >= 4)
+        return 0;
     uint64_t bestL = *l;
     uint64_t bestH = *h;
 
@@ -328,7 +383,7 @@ void phaseI_routine(
         int seed_end_base = E0_base;
         uint64_t addr_f = compute_jumpN_from_base4(pat_f4, seed_end_base, JT_LEN_NT);
         tail_f = 0;
-        uint64_t jp_f = jump_pointers[addr_f];
+        uint64_t jp_f = jump_entry_at(addr_f);
         extract_jump_bounds(jp_f, &l_f, &h_f, &diff_f);
     }
 
@@ -337,7 +392,7 @@ void phaseI_routine(
         int seed_end_base = E0_base;
         uint64_t addr_r = compute_jumpN_from_base4(pat_rc4, seed_end_base, JT_LEN_NT);
         tail_r = 0;
-        uint64_t jp_r = jump_pointers[addr_r];
+        uint64_t jp_r = jump_entry_at(addr_r);
         extract_jump_bounds(jp_r, &l_r, &h_r, &diff_r);
     }
 
@@ -356,7 +411,7 @@ void phaseI_routine(
         int seed_end_base = E0_base;
         addr_f = compute_jumpN_from_base4(pat_f4, seed_end_base, JT_LEN_NT);
         tail_f = 0;
-        uint64_t jp_f = jump_pointers[addr_f];
+        uint64_t jp_f = jump_entry_at(addr_f);
         extract_jump_bounds(jp_f, &l_f, &h_f, &diff_f);
     }
     const int use_rc = 0;
@@ -386,8 +441,8 @@ void phaseI_routine(
             short_read_len = pivot_base;
             tail_b = 0;
             int seed_end_base = pivot_base;
-            uint32_t addr = compute_jumpN_from_base4(pat, seed_end_base, JT_LEN_NT);
-            uint64_t jp = jump_pointers[addr];
+            uint64_t addr = compute_jumpN_from_base4(pat, seed_end_base, JT_LEN_NT);
+            uint64_t jp = jump_entry_at(addr);
             extract_jump_bounds(jp, &l, &h, &diff);
         }
 
@@ -458,7 +513,7 @@ void phaseI_routine(
 
             pivot_base = next_pivot_after_seed_base(seed_end_base,
                                                     seed_len_bases,
-                                                    emitted);
+                                                    emitted, pat);
 
             if (pivot_base < JT_LEN_NT - 1) break;
             if (pivot_base + 1 < min_seed_a){
@@ -590,7 +645,7 @@ void phaseI_routine(
 
         pivot_base = next_pivot_after_seed_base(seed_end_base,
                                                 seed_len_bases,
-                                                emitted);
+                                                emitted, pat);
         if (pivot_base < JT_LEN_NT - 1) break;
         if (pivot_base + 1 < min_seed_a){
             break;
@@ -681,12 +736,12 @@ static void phaseI_slot_init(
 #ifdef ENABLE_F_RC_CHOICE
     {
         uint64_t addr_f = compute_jumpN_from_base4(f4, E0_base, JT_LEN_NT);
-        uint64_t jp_f   = jump_pointers[addr_f];
+        uint64_t jp_f   = jump_entry_at(addr_f);
         extract_jump_bounds(jp_f, &l_f, &h_f, &diff_f);
     }
     {
         uint64_t addr_r = compute_jumpN_from_base4(rc4, E0_base, JT_LEN_NT);
-        uint64_t jp_r   = jump_pointers[addr_r];
+        uint64_t jp_r   = jump_entry_at(addr_r);
         extract_jump_bounds(jp_r, &l_r, &h_r, &diff_r);
     }
     const int use_rc = (diff_r > 0 && (diff_f == 0 || diff_r < diff_f));
@@ -698,7 +753,7 @@ static void phaseI_slot_init(
 #else
     {
         uint64_t addr_f = compute_jumpN_from_base4(f4, E0_base, JT_LEN_NT);
-        uint64_t jp_f   = jump_pointers[addr_f];
+        uint64_t jp_f   = jump_entry_at(addr_f);
         extract_jump_bounds(jp_f, &l_f, &h_f, &diff_f);
     }
     st->chosen_strand = 0;
@@ -825,7 +880,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
             st->first_iter = 0;
         } else {
             uint64_t addr = compute_jumpN_from_base4(pat, pivot_base, JT_LEN_NT);
-            uint64_t jp   = jump_pointers[addr];
+            uint64_t jp   = jump_entry_at(addr);
             extract_jump_bounds(jp, &st->l, &st->h, &st->diff);
         }
 
@@ -871,7 +926,7 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
             }
 
             st->pivot_base = next_pivot_after_seed_base(
-                st->seed_end_base, st->seed_len_bases, emitted);
+                st->seed_end_base, st->seed_len_bases, emitted, pat);
 
             /* check exit conditions: same as phaseI_routine */
             if (st->pivot_base < JT_LEN_NT - 1) { st->pivot_base = -1; return 0; }
@@ -1018,31 +1073,28 @@ static int phaseI_slot_step(PhaseI_PivotState *st)
         }
 
         st->pivot_base = next_pivot_after_seed_base(
-            st->seed_end_base, st->seed_len_bases, emitted);
+            st->seed_end_base, st->seed_len_bases, emitted, pat);
 
         if (st->pivot_base < JT_LEN_NT - 1) { st->pivot_base = -1; return 0; }
         if (st->pivot_base + 1 < min_seed_a) { st->pivot_base = -1; return 0; }
 
-        /* prefetch jump entry for NEXT pivot */
         if (st->pivot_base >= JT_LEN_NT - 1) {
             uint64_t next_addr =
                 compute_jumpN_from_base4(pat, st->pivot_base, JT_LEN_NT);
             __builtin_prefetch(&jump_pointers[next_addr], 0, 1);
         }
 
-        /* reset for next pivot */
         st->phase        = 0;
         st->fm_loop_done = 0;
         st->ref_after    = 0;
         return 1;
     }
 
-    return 0; /* unreachable */
+    return 0; 
 }
 
 /* -----------------------------------------------------------------------
    phaseI_batch_interleaved()
-
    Entry point called by rosaseed_core_bridge_batched.cpp 
    ----------------------------------------------------------------------- */
 void phaseI_batch_interleaved(
@@ -1102,12 +1154,12 @@ void phaseI_probe_first_pivot(PhaseI_SlotState *slot)
 #ifdef ENABLE_F_RC_CHOICE
     {
         uint64_t addr_f = compute_jumpN_from_base4(slot->f4, E0_base, JT_LEN_NT);
-        uint64_t jp_f   = jump_pointers[addr_f];
+        uint64_t jp_f   = jump_entry_at(addr_f);
         extract_jump_bounds(jp_f, &l_f, &h_f, &diff_f);
     }
     {
         uint64_t addr_r = compute_jumpN_from_base4(slot->rc4, E0_base, JT_LEN_NT);
-        uint64_t jp_r   = jump_pointers[addr_r];
+        uint64_t jp_r   = jump_entry_at(addr_r);
         extract_jump_bounds(jp_r, &l_r, &h_r, &diff_r);
     }
     const int use_rc = (diff_r > 0 && (diff_f == 0 || diff_r < diff_f));
@@ -1118,7 +1170,7 @@ void phaseI_probe_first_pivot(PhaseI_SlotState *slot)
 #else
     {
         uint64_t addr_f = compute_jumpN_from_base4(slot->f4, E0_base, JT_LEN_NT);
-        uint64_t jp_f   = jump_pointers[addr_f];
+        uint64_t jp_f   = jump_entry_at(addr_f);
         extract_jump_bounds(jp_f, &l_f, &h_f, &diff_f);
     }
     slot->chosen_strand = 0;
