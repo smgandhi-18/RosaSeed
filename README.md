@@ -198,7 +198,7 @@ secondary and supplementary records are skipped.
 |---|---|
 | Ambiguous bases (`N`) in reads | Supported. Seed extension stops at an `N` and resumes past it, the same way the BWA-MEM2 SMEM search does. No preprocessing is required; the scripts in `preprocessing/` are optional. |
 | Variable read lengths in one FASTQ | Supported. Reads do not need to be trimmed to a uniform length. |
-| Maximum read length | RosaSeed (2-step): no fixed limit. RosaSeed-Compact: 251 bp, override at compile time with `-DRS_BATCH_MAX_READ_LEN=<n>`. |
+| Maximum read length | 251 bp for both RosaSeed and RosaSeed-Compact (`RS_BATCH_MAX_READ_LEN`, which sizes the per-read slot arrays). A longer read makes the seeder exit with an error naming the limit, rather than truncating silently. Raise it at compile time with `-DRS_BATCH_MAX_READ_LEN=<n>`; the cost is a few KB per thread. Standard 100/150/250 bp Illumina reads need no change. |
 | Non-ACGT bases in the *reference* | Replaced with `A` by the index builder (`preprocess_genome`), preserving genome coordinates. |
 
 ---
@@ -259,9 +259,9 @@ expected to be identical.
 The BWA-MEM2 index (Step 3 of Quick start) is still required. The jump-table
 flag must match a table built with `-j`, and `-DSA_COMPRESSION_FACTOR_POWER`
 selects which `sa_*_cf*.bin` pair is loaded, as for RosaSeed. The runtime
-flags (`--rs-*`, `-k`, `-t`) are the same as for RosaSeed. RosaSeed-Compact accepts reads up to 251 bp
-(override at compile time with `-DRS_BATCH_MAX_READ_LEN=<n>`), and has the
-same 2^32 bp genome limit as RosaSeed.
+flags (`--rs-*`, `-k`, `-t`) are the same as for RosaSeed, including the 251 bp
+read-length limit (see [Read handling](#read-handling)) and the 2^32 bp genome
+limit.
 
 > **Note:** `make clean` is required before switching between RosaSeed
 > (2-step) and RosaSeed-Compact builds: object files are not rebuilt just
@@ -400,6 +400,15 @@ Two filtering modes are supported:
 | `-DROSASEED_PRECHAIN_WEAK_LEN=N`         | Seed-length threshold used to classify weak singleton candidates. Candidates shorter than `N` nt may be suppressed when the other filtering conditions are satisfied. Default: `60`.                                                                                        |
 | `-DROSASEED_PRECHAIN_USE_ABUNDANCE`      | Enables the abundance-aware variant (SSF+A). This option is meaningful only when `ROSASEED_PRECHAIN_SINGLETON_SUPPRESS` is enabled. A weak singleton candidate is suppressed only when its occurrence count is also greater than or equal to `ROSASEED_PRECHAIN_ABUNDANCE`. |
 | `-DROSASEED_PRECHAIN_ABUNDANCE=N`        | Seed-abundance threshold used by SSF+A. Weak singleton candidates with occurrence count `>= N` are treated as highly repetitive and suppressed. Default: `500`.                                                                                                             |
+
+---
+
+#### Read batching and length
+
+| Flag | Default | Description |
+|---|---|---|
+| `-DRS_BATCH_MAX_READ_LEN=N` | 251 | Maximum read length the seeder accepts, in both variants. It sizes the fixed per-read arrays in the batch slot state, so it is an allocation bound: a longer read makes the seeder stop with an error naming the limit. Raising it costs roughly `2 * RS_BATCH * N` bytes per thread. |
+| `-DRS_BATCH=N` | 32 | Number of reads the Phase A interleaver processes at once. Larger batches give the prefetcher more independent memory accesses to overlap, at the cost of slot-state memory. |
 
 ---
 
