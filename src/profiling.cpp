@@ -110,61 +110,82 @@ int display_stats(int nthreads)
             avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
 #endif
     
+    /* ------------------------------------------------------------------
+       Kernel breakdown.
+
+       The categories below are disjoint and add up to the total, so no
+       component is counted twice:
+
+         seed processing  seed search + seed sorting + SA (suffix array)
+                          lookup.
+                          RosaSeed: tprof[MEM_COLLECT] wraps the whole
+                            rosaseed_inprocess_seed_batch() call, which already
+                            performs Phase A/B/C, the seed sort and the SA
+                            materialisation (tprof[MEM_SA] is unused, 0).
+                          BWA-MEM2: tprof[MEM_COLLECT] is mem_collect_smem()
+                            (SMEM search incl. sortSMEMs()) and tprof[MEM_SA]
+                            is the separately timed SA lookup, which happens
+                            inside mem_chain_seeds().
+         chaining         chain construction from the seeds.
+                          RosaSeed: mem_chain_preexpanded_hits(), timed whole
+                            in tprof[MEM_SA_BLOCK] (includes the inline
+                            pre-chain singleton filter, which has no timer of
+                            its own).
+                          BWA-MEM2: mem_chain_seeds() minus the SA lookup
+                            already attributed to seed processing, i.e.
+                            tprof[MEM_SA_BLOCK] - tprof[MEM_SA].
+         chain filtering  mem_chain_flt() + mem_flt_chained_seeds().
+         BSW              banded Smith-Waterman extension.
+         unattributed     total kernel minus the above; bookkeeping residue.
+       ------------------------------------------------------------------ */
     fprintf(stderr, "\n\tKernels' compute time (sec):\n");
+
+    double t_total = 0.0, t_smem = 0.0, t_sa = 0.0, t_sa_block = 0.0;
+    double t_chain_flt = 0.0, t_flt_seeds = 0.0, t_bsw = 0.0;
+
     find_opt(tprof[WORKER10], 1, &max, &min, &avg);
-    fprintf(stderr, "\tTotal kernel (smem+sal+bsw) time avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-    
-#if HIDE
-    find_opt(tprof[MEM_ALN_M1], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tMEM_ALN_CHAIN_FLT avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-    
-    find_opt(tprof[MEM_ALN_M2], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tMEM_ALN_CHAIN_SEED avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-#endif
-    
+    t_total = avg*1.0/proc_freq;
     find_opt(tprof[MEM_COLLECT], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tSMEM compute avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-
-#if HIDE
-    find_opt(tprof[MEM_CHAIN], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tMEM_CHAIN avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-#endif
-    
-    find_opt(tprof[MEM_SA_BLOCK], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tSAL compute avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-    
-    #if 1 //HIDE
+    t_smem = avg*1.0/proc_freq;
     find_opt(tprof[MEM_SA], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\t\t\tMEM_SA avg: %0.2lf, (%0.2lf, %0.2lf)\n\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-    #endif
-    
-    find_opt(tprof[FILTERS], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tExtra filters (after seeding, before chaining) time, avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
-
+    t_sa = avg*1.0/proc_freq;
+    find_opt(tprof[MEM_SA_BLOCK], nthreads, &max, &min, &avg);
+    t_sa_block = avg*1.0/proc_freq;
     find_opt(tprof[MEM_CHAIN_FLT], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tmem_chain_flt() time, avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);       
-                
-    find_opt(tprof[SINGLETON], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tWeak singleton filter time, avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);           
-
+    t_chain_flt = avg*1.0/proc_freq;
     find_opt(tprof[FLT_CHAINED_SEEDS], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tmem_flt_chained_seeds() time, avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);  
-            
-    // printf("\n\t BSW compute time (sec):\n");
+    t_flt_seeds = avg*1.0/proc_freq;
     find_opt(tprof[MEM_ALN2], nthreads, &max, &min, &avg);
-    fprintf(stderr, "\t\tBSW time, avg: %0.2lf, (%0.2lf, %0.2lf)\n",
-            avg*1.0/proc_freq, max*1.0/proc_freq, min*1.0/proc_freq);
+    t_bsw = avg*1.0/proc_freq;
+
+#ifdef ROSASEED_INPROCESS
+    const double t_seed_proc = t_smem;              /* SA lookup is inside it */
+    const double t_chaining  = t_sa_block;          /* mem_chain_preexpanded_hits */
+#else
+    const double t_seed_proc = t_smem + t_sa;       /* SMEM search + SA lookup */
+    const double t_chaining  = t_sa_block - t_sa;   /* chain build, SA removed */
+#endif
+    const double t_sum = t_seed_proc + t_chaining + t_chain_flt + t_flt_seeds + t_bsw;
+
+    fprintf(stderr, "\tTotal kernel (seeding+SA+chaining+BSW) time: %0.2lf\n", t_total);
+
+#ifdef ROSASEED_INPROCESS
+    fprintf(stderr, "\t\tSeed processing (RosaSeed seeding + sort + SA lookup): %0.2lf\n",
+            t_seed_proc);
+    fprintf(stderr, "\t\t\t(per-phase split printed by the RosaSeed bridge below)\n");
+    fprintf(stderr, "\t\tChaining (mem_chain_preexpanded_hits, incl. pre-chain filter): %0.2lf\n",
+            t_chaining);
+#else
+    fprintf(stderr, "\t\tSeed processing (SMEM search + sort + SA lookup): %0.2lf\n",
+            t_seed_proc);
+    fprintf(stderr, "\t\t\tSMEM search + sort (mem_collect_smem): %0.2lf\n", t_smem);
+    fprintf(stderr, "\t\t\tSA lookup (get_sa_entries*): %0.2lf\n", t_sa);
+    fprintf(stderr, "\t\tChaining (mem_chain_seeds minus SA lookup): %0.2lf\n", t_chaining);
+#endif
+    fprintf(stderr, "\t\tChain filtering (mem_chain_flt): %0.2lf\n", t_chain_flt);
+    fprintf(stderr, "\t\tChained-seed filtering (mem_flt_chained_seeds): %0.2lf\n", t_flt_seeds);
+    fprintf(stderr, "\t\tBSW extension: %0.2lf\n", t_bsw);
+    fprintf(stderr, "\t\tUnattributed (total - above): %0.2lf\n", t_total - t_sum);
 
     #if HIDE
     int agg1 = 0, agg2 = 0, agg3 = 0;
