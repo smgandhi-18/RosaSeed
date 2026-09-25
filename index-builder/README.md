@@ -1,22 +1,35 @@
-# 2-step RosaSeed FM-index Build Pipeline
+# RosaSeed FM-index build pipelines
 
-Builds a complete FM-index from any FASTA genome file for the 2-step RosaSeed.
+Builds a complete FM index from any FASTA genome, for either RosaSeed variant:
+
+| Pipeline | Variant | Encoding | Output directory |
+|---|---|---|---|
+| `build_2step_pipeline.sh` | RosaSeed (2-step) | base-16, FE+FO+RCE+RCO | `index/<genome>/` |
+| `build_compact_pipeline.sh` | RosaSeed-Compact (1-step) | radix-4, forward + reverse complement | `index/<genome>_compact/` |
+
+Both accept a FASTA as downloaded, compile their tools on first run, and fetch
+gsufsort automatically if it is not already present.
 
 ## Repository structure
 
 ```
-rosaseed-index/
-├── build_2step_pipeline.sh   ← run this
-├── rss_monitor.py            ← background RAM tracker (auto-used by script)
+index-builder/
+├── build_2step_pipeline.sh       2-step index (run this, or the one below)
+├── build_compact_pipeline.sh     RosaSeed-Compact index
+├── rss_monitor.py                background RAM tracker, used by both scripts
 ├── src/
-│   ├── preprocess_genome.c       FASTA → clean single-line ACGT
-│   ├── derive_2stepref.c         ACGT → base-16 2-step reference (FE+FO+RCE+RCO)
-│   ├── convert_sa_to_bin_CF.c    binary SA → compressed SA files (CF=1,2,4,8)
-│   ├── make_cp_occ_2step.c       binary BWT → OCC checkpoints + bitvectors
-│   ├── make_ref16_packed.c       base-16 ASCII ref → nibble-packed binary
-│   └── make_jumptable_2step.c    cp_occ + SA → k-mer jump tables
+│   ├── preprocess_genome.c           FASTA -> clean single-line ACGT (shared)
+│   ├── convert_sa_to_bin_CF.c        binary SA -> compressed SA files (shared)
+│   ├── derive_2stepref.c             ACGT -> base-16 reference (FE+FO+RCE+RCO)
+│   ├── make_cp_occ_2step.c           BWT -> OCC checkpoints + bitvectors
+│   ├── make_ref16_packed.c           base-16 reference -> nibble-packed binary
+│   ├── make_jumptable_2step.c        cp_occ + SA -> k-mer jump tables
+│   ├── derive_compactref.c           ACGT -> forward + reverse-complement text
+│   ├── make_cp_occ_compact.c         BWT -> 32-byte OCC blocks
+│   ├── make_ref4_packed_compact.c    reference -> 2 bits per base
+│   └── make_jumptable_compact.c      cp_occ + SA -> k-mer jump tables
 ├── tools/                        auto-populated on first run
-│   └── gsufsort/                 auto-cloned from GitHub if not found
+│   └── gsufsort/                     auto-cloned from GitHub if not found
 └── README.md
 ```
 
@@ -32,20 +45,24 @@ sudo apt install gcc make git python3 python3-numpy
 ## Quick start
 
 ```bash
-git clone <this-repo> rosaseed-index
-cd rosaseed-index
-chmod +x build_2step_pipeline.sh
+cd index-builder
 
-# Build index: 14+15-mer jump tables by default
+# 2-step index: 14+15-mer jump tables by default
 ./build_2step_pipeline.sh /path/to/genome.fna
+
+# RosaSeed-Compact index
+./build_compact_pipeline.sh /path/to/genome.fna
 ```
 
 Index files are written to `./index/<genome_basename>/` by default.
 
 ## Usage
 
+Both scripts take the same options.
+
 ```
-./build_2step_pipeline.sh [OPTIONS] <genome.fa>
+./build_2step_pipeline.sh   [OPTIONS] <genome.fa>
+./build_compact_pipeline.sh [OPTIONS] <genome.fa>
 
 Options:
   -o <dir>   Output directory  (default: ./index/<genome_basename>/)
@@ -57,8 +74,17 @@ Options:
                16      16-mer only  (32 GiB output, ~20 min)
                all     14 + 15 + 16
                14,15   default: recommended for most read lengths
+               also accepted: 14,16 and 15,16
   -h         Help
 ```
+
+The jump-table sizes above are for the 2-step encoding, where a 14-mer table
+holds 16^7 entries. The compact tables hold 4^k entries, so a compact 14-mer
+table is 2 GiB, 15-mer 8 GiB and 16-mer 32 GiB as well.
+
+Whichever sizes are built, the aligner must be compiled with the matching
+`-DLOAD_JTABLE_{14,15,16}nt`, and `-DSA_COMPRESSION_FACTOR_POWER` selects which
+`sa_*_cf*.bin` pair is loaded. All four compression factors are always built.
 
 ## Examples
 
@@ -71,9 +97,15 @@ Options:
 
 # GRCh38: 15-mer only, keep original SA file
 ./build_2step_pipeline.sh -k -j 15 -o /scratch/hg38_index hg38.fa
+
+# RosaSeed-Compact index for the same genome
+./build_compact_pipeline.sh GCF_009914755.1_T2T-CHM13v2.0_genomic.fna
+
+# Compact, 15-mer table only, custom output directory
+./build_compact_pipeline.sh -j 15 -o /data/T2T_compact T2T_CHM13.fna
 ```
 
-## Output files
+## Output files (2-step)
 
 | File | Size (T2T CHM13) | Description |
 |------|-----------------|-------------|
@@ -141,11 +173,34 @@ as for 2-step.
 | `jumptable_{14,15,16}nt.bin` | 4^k × 8-byte jump-table entries |
 
 Build the aligner with `ROSASEED=1 ROSASEED_1STEP=1` to use this index.
-Resource use for a human genome has not yet been re-measured with this script;
-the original 1-step pipeline estimated about 37 GB RAM for jump-table
-generation, and gsufsort runs on a text of the same length as the 2-step one.
 
-## Pipeline steps
+Measured on T2T-CHM13v2.0 (3.1 Gbp) with the default 14+15-mer tables, on a
+24-core Zen 3 workstation: **39 min 25 s wall time, 52.3 GB peak RSS**, the peak
+occurring during gsufsort. Output totals about 76 GB, of which the two largest
+items are the CF=1 suffix-array files (31 GB) and the 15-mer jump table (8 GB).
+
+The run also leaves three intermediates in the output directory: the cleaned
+ACGT genome (`*_clean.txt`), the forward + reverse-complement text
+(`*_compact_ref.txt`) and its BWT. They are not read at alignment time and can
+be deleted, which recovers about 15 GB for a human genome.
+
+```
+[ 1/13 ] Check dependencies        gcc, make, git, python3, numpy
+[ 2/13 ] Compile tools             src/*.c -> binaries (only if source is newer)
+[ 3/13 ] Locate gsufsort-64        auto-clone + compile into tools/ if needed
+[ 4/13 ] Preprocess FASTA          strip headers, join contigs, N/IUPAC -> A
+[ 5/13 ] Build compact reference   forward genome + its reverse complement
+[ 6/13 ] Run gsufsort              SA + BWT construction (the memory peak)
+[ 7/13 ] Trim first entry          remove the null terminator from SA + BWT
+[ 8/13 ] Verify BWT                character counts, 1 terminator, no junk
+[ 9/13 ] Compressed SA files       CF=1,2,4,8: 5-byte split per entry
+[10/13 ] Delete original SA        use -k to keep it
+[11/13 ] cp_occ_compact.bin        OCC checkpoints, 32-byte blocks
+[12/13 ] ref4_packed.bin           2 bits per base
+[13/13 ] Jump table(s)             14+15-mer default; -j 16 or -j all for more
+```
+
+## Pipeline steps (2-step)
 
 ```
 [ 1/15 ] Check dependencies         gcc, make, git, python3, numpy
@@ -193,13 +248,16 @@ generation, and gsufsort runs on a text of the same length as the 2-step one.
   Peak RSS  : 52.4 GB  (during: jumptable_15nt)
 ```
 
-## Non-ACGT character handling
+## Non-ACGT character handling (both pipelines)
 
 N and all IUPAC ambiguity codes (R,Y,S,W,K,M,B,D,H,V) are replaced with `A`.  
 Sequence length is preserved, genome coordinates remain intact.  
 Reads may align to replaced regions; exclude those chromosomes from the input FASTA if needed.
 
 ## The 2-step encoding
+
+This section describes `build_2step_pipeline.sh` only; the compact pipeline
+indexes the four-base alphabet directly.
 
 The 2-step reference encodes pairs of consecutive nucleotides as a single
 base-16 symbol (0-9, A-F), reducing the alphabet from 4 to 16 symbols.
