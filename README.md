@@ -524,7 +524,7 @@ Tree (ERT) algorithm on simulated and real short-read datasets:
 | vs BWA-MEM2 (SA cf=8) | **15.0×** | **4.04×** |
 | vs ERT | 4.0× | 2.48× |
 | vs ERT2 | 1.2× | 1.44× |
-| vs Minimap2 | 4.8× | 2.48× |
+| vs Minimap2 | 4.8× | 3.31× |
 | vs Bowtie2 | 33.2× | 10.8× |
 
 Peak memory: **49.61 GB**, ~25% less than ERT/ERT2 (~66.3 GB each).

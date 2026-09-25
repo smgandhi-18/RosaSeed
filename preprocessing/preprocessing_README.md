@@ -1,18 +1,20 @@
 # Read preprocessing: ambiguous-base (N) filtering
 
-Before alignment, all sequencing datasets used in the RosaSeed evaluation are
-preprocessed to remove reads containing ambiguous or non-canonical bases (any
-base outside `{A, C, G, T}`, which includes `N` and all IUPAC ambiguity codes).
-RosaSeed's seeding pipeline operates on a s-step encoding and therefore
-requires reads composed solely of the four canonical nucleotides time being.
-More changes coming soon!
+These scripts remove reads containing ambiguous or non-canonical bases: any
+base outside `{A, C, G, T}`, which includes `N` and all IUPAC ambiguity codes.
 
-The **same filtered read set is used for every aligner benchmarked** (RosaSeed,
-BWA-MEM2, Minimap2, Bowtie2, ERT, ERT2, minibwa, Strobealign), ensuring that all
-tools receive identical input and the comparison is fair.
+**Filtering is optional.** RosaSeed and RosaSeed-Compact both handle ambiguous
+bases directly: seed extension stops at an `N` and resumes past it, as the
+BWA-MEM2 SMEM search does, so unfiltered reads align correctly. Reads of
+differing lengths in one file are also fine; no trimming is required. See
+"Read handling" in the top-level README.
 
-The scripts in this folder implement that filtering and are provided so that the
-exact read sets reported in the paper can be reproduced from the public raw data.
+The scripts exist for benchmarking. The **same filtered read set is used for
+every aligner compared** (RosaSeed, BWA-MEM2, Minimap2, Bowtie2, ERT, ERT2,
+minibwa, Strobealign), so every tool receives byte-identical input and no result
+can be attributed to one aligner handling ambiguous bases differently from
+another. They are published so the exact read sets reported in the paper can be
+reproduced from the public raw data.
 
 ## Scripts
 
@@ -38,9 +40,10 @@ datasets.
   **either** mate contains a disallowed base. Dropping only one mate would
   desynchronize R1 and R2; keeping pairs intact preserves correct mate pairing.
 
-By default the accepted alphabet is `{A, C, G, T, a, c, g, t}` (lowercase
-soft-masked bases are kept). Pass `--strict-uppercase` to accept only
-`{A, C, G, T}`.
+By default the accepted alphabet is `{A, C, G, T, a, c, g, t}`: lowercase
+soft-masked bases are kept, which is what `--allow-lowercase` selects and is the
+default. Pass `--strict-uppercase` to accept only `{A, C, G, T}`, which drops
+any read containing a soft-masked base.
 
 ## Usage
 
