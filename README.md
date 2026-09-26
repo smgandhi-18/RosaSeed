@@ -1,7 +1,7 @@
 # RosaSeed
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Paper](https://img.shields.io/badge/Paper-bioRxiv-red.svg)](https://doi.org/...)
+[![Paper](https://img.shields.io/badge/Paper-bioRxiv-red.svg)](https://doi.org/10.64898/2026.09.20.753062)
 
 ![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)
 ![C](https://img.shields.io/badge/C-C11-blue.svg)
@@ -568,9 +568,11 @@ This is why both the RosaSeed index (`--rs-index`) and the BWA-MEM2 index
 
 If you use RosaSeed in your research, please cite:
 
-> Gandhi Shyama, Cockburn Bruce (2026). RosaSeed: A Configurable Seeding Framework 
-> for Fast and Accurate Short-Read Alignment, 2026, 
-> University of Alberta. URL: 
+> Gandhi, Shyama M., Cockburn, Bruce F. (2026). RosaSeed: Faster and Accurate
+> Short Read Alignment Using a Configurable Seeding Strategy. bioRxiv preprint,
+> University of Alberta.
+> DOI: [10.64898/2026.09.20.753062](https://doi.org/10.64898/2026.09.20.753062)
+> URL: https://www.biorxiv.org/content/10.64898/2026.09.20.753062v1
 
 Please also cite the original BWA-MEM2:
 
